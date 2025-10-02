@@ -18,6 +18,9 @@ struct Msg
 template <typename TDerived>
 class Wnd
 {
+    template <typename>
+    friend class Dlg;
+
     HWND    _hWnd;
     bool    _destroyed;
     WNDPROC _defWndProc;
@@ -80,36 +83,6 @@ private:
 #else
         return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
 #endif
-    }
-
-    static INT_PTR CALLBACK StaticDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
-    {
-        Wnd* pThis = GetThisFromHandle(hDlg);
-
-        if (pThis == nullptr &&
-            uMsg == WM_INITDIALOG)
-        {
-            auto* pWrapper = reinterpret_cast<_CreateParamWrapper*>(lParam);
-
-            if (pWrapper != nullptr) {
-                pThis = pWrapper->pThis;
-                pThis->_hWnd = hDlg;
-                BindThisToHandle(hDlg, pThis);
-                lParam = reinterpret_cast<LPARAM>(pWrapper->lpParam);
-            }
-        }
-
-        if (pThis != nullptr)
-        {
-            Msg msg{ uMsg, wParam, lParam };
-            LRESULT unused = 0;
-
-            bool result =
-                pThis->WndProc(msg, unused);
-            return result;
-        }
-
-        return FALSE;
     }
 
 protected:
@@ -178,31 +151,6 @@ protected:
 
         return _hWnd != NULL;
     }
-
-    bool CreateDlg(
-        HINSTANCE hInstance,
-        LPCSTR lpTemplateName,
-        HWND hWndParent,
-        LPARAM dwInitParam = 0)
-    {
-        if (_hWnd != NULL) {
-            return false;
-        }
-
-        _CreateParamWrapper initParam{
-            this, reinterpret_cast<LPVOID>(dwInitParam) };
-
-        _defWndProc = DefDlgProcA;
-
-        _hWnd = CreateDialogParamA(
-            hInstance,
-            lpTemplateName,
-            hWndParent,
-            StaticDlgProc,
-            reinterpret_cast<LPARAM>(&initParam));
-
-        return _hWnd != NULL;
-    }
 #else
     bool CreateHandle(
         DWORD dwExStyle,
@@ -260,31 +208,6 @@ protected:
             hMenu,
             hInstance,
             &createParam);
-
-        return _hWnd != NULL;
-    }
-
-    bool CreateDlg(
-        HINSTANCE hInstance,
-        LPCWSTR lpTemplateName,
-        HWND hWndParent,
-        LPARAM dwInitParam = 0)
-    {
-        if (_hWnd != NULL) {
-            return false;
-        }
-
-        _CreateParamWrapper initParam{
-            this, reinterpret_cast<LPVOID>(dwInitParam) };
-
-        _defWndProc = DefDlgProcW;
-
-        _hWnd = CreateDialogParamW(
-            hInstance,
-            lpTemplateName,
-            hWndParent,
-            StaticDlgProc,
-            reinterpret_cast<LPARAM>(&initParam));
 
         return _hWnd != NULL;
     }
@@ -366,13 +289,115 @@ public:
     {
         return ::PostMessageW(_hWnd, uMsg, wParam, lParam);
     }
+};
 
+template <typename TDerived>
+class Dlg : public Wnd<TDerived>
+{
+    using TBase = Wnd<TDerived>;
+
+private:
+    static INT_PTR CALLBACK StaticDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
+    {
+        TBase* pThis = TBase::GetThisFromHandle(hDlg);
+
+        if (pThis == nullptr &&
+            uMsg == WM_INITDIALOG)
+        {
+            auto* pWrapper = reinterpret_cast<TBase::_CreateParamWrapper*>(lParam);
+
+            if (pWrapper != nullptr) {
+                pThis = pWrapper->pThis;
+                pThis->_hWnd = hDlg;
+                TBase::BindThisToHandle(hDlg, pThis);
+                lParam = reinterpret_cast<LPARAM>(pWrapper->lpParam);
+            }
+        }
+
+        if (pThis != nullptr)
+        {
+            Msg msg{ uMsg, wParam, lParam };
+            LRESULT unused = 0;
+
+            bool result =
+                pThis->WndProc(msg, unused);
+            return result;
+        }
+
+        return FALSE;
+    }
+
+protected:
+    Dlg() noexcept
+        : TBase()
+    {
+    }
+
+#if defined(WND_USE_ANSI_WINDPROC)
+    bool CreateDlg(
+        HINSTANCE hInstance,
+        LPCSTR lpTemplateName,
+        HWND hWndParent,
+        LPARAM dwInitParam = 0)
+    {
+        TBase& self = *static_cast<TBase*>(this);
+
+        if (self._hWnd != NULL) {
+            return false;
+        }
+
+        typename TBase::_CreateParamWrapper initParam{
+            this, reinterpret_cast<LPVOID>(dwInitParam) };
+
+        self._defWndProc = ::DefDlgProcA;
+
+        self._hWnd = ::CreateDialogParamA(
+            hInstance,
+            lpTemplateName,
+            hWndParent,
+            StaticDlgProc,
+            reinterpret_cast<LPARAM>(&initParam));
+
+        return self._hWnd != NULL;
+    }
+#else
+    bool CreateDlg(
+        HINSTANCE hInstance,
+        LPCWSTR lpTemplateName,
+        HWND hWndParent,
+        LPARAM dwInitParam = 0)
+    {
+        TBase& self = *static_cast<TBase*>(this);
+
+        if (self._hWnd != NULL) {
+            return false;
+        }
+
+        typename TBase::_CreateParamWrapper initParam{
+            this, reinterpret_cast<LPVOID>(dwInitParam) };
+
+        self._defWndProc = ::DefDlgProcW;
+
+        self._hWnd = ::CreateDialogParamW(
+            hInstance,
+            lpTemplateName,
+            hWndParent,
+            StaticDlgProc,
+            reinterpret_cast<LPARAM>(&initParam));
+
+        return self._hWnd != NULL;
+    }
+#endif
+
+public:
     bool EndDialog(INT_PTR nResult)
     {
-        bool result = ::EndDialog(_hWnd, nResult);
+        TBase& self = *static_cast<TBase*>(this);
+        bool result = ::EndDialog(self._hWnd, nResult);
 
-        if (result)
-            _destroyed = true;
+        if (result) {
+            self._destroyed = true;
+        }
         return result;
     }
 };
