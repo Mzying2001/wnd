@@ -18,8 +18,8 @@ struct Msg
 template <typename TDerived>
 class Wnd
 {
-    HWND _hWnd;
-    bool _destroyed;
+    HWND    _hWnd;
+    bool    _destroyed;
     WNDPROC _defWndProc;
 
 private:
