@@ -88,7 +88,7 @@ protected:
     }
 
 #if defined(WND_USE_ANSI_WINDPROC)
-    bool Create(
+    bool CreateHandle(
         DWORD dwExStyle,
         LPCSTR lpClassName,
         LPCSTR lpWindowName,
@@ -148,7 +148,7 @@ protected:
         return _hWnd != NULL;
     }
 #else
-    bool Create(
+    bool CreateHandle(
         DWORD dwExStyle,
         LPCWSTR lpClassName,
         LPCWSTR lpWindowName,
