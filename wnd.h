@@ -23,7 +23,8 @@ class Wnd
     WNDPROC _defWndProc;
 
 private:
-    static constexpr WCHAR _PROP_THIS[] = L"__Wnd_This_Ptr";
+    static constexpr WCHAR
+        _PROP_THIS[] = L"__Wnd_This_Ptr";
 
     struct _CreateParamWrapper
     {
@@ -79,6 +80,40 @@ private:
 #else
         return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
 #endif
+    }
+
+    static INT_PTR CALLBACK StaticDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
+    {
+        Wnd* pThis = GetThisFromHandle(hDlg);
+
+        if (pThis == nullptr &&
+            uMsg == WM_INITDIALOG)
+        {
+            auto* pWrapper = reinterpret_cast<_CreateParamWrapper*>(lParam);
+
+            if (pWrapper != nullptr) {
+                pThis = pWrapper->pThis;
+                pThis->_hWnd = hDlg;
+                BindThisToHandle(hDlg, pThis);
+                lParam = reinterpret_cast<LPARAM>(pWrapper->lpParam);
+            }
+        }
+
+        if (pThis != nullptr)
+        {
+            Msg msg{ uMsg, wParam, lParam };
+            LRESULT unused = 0;
+
+            bool result =
+                pThis->WndProc(msg, unused);
+
+            if (uMsg == WM_NCDESTROY) {
+                pThis->_destroyed = true;
+            }
+            return result;
+        }
+
+        return FALSE;
     }
 
 protected:
@@ -147,6 +182,31 @@ protected:
 
         return _hWnd != NULL;
     }
+
+    bool CreateDlg(
+        HINSTANCE hInstance,
+        LPCSTR lpTemplateName,
+        HWND hWndParent,
+        LPARAM dwInitParam = 0)
+    {
+        if (_hWnd != NULL) {
+            return false;
+        }
+
+        _CreateParamWrapper initParam{
+            this, reinterpret_cast<LPVOID>(dwInitParam) };
+
+        _defWndProc = DefDlgProcA;
+
+        _hWnd = CreateDialogParamA(
+            hInstance,
+            lpTemplateName,
+            hWndParent,
+            StaticDlgProc,
+            reinterpret_cast<LPARAM>(&initParam));
+
+        return _hWnd != NULL;
+    }
 #else
     bool CreateHandle(
         DWORD dwExStyle,
@@ -204,6 +264,31 @@ protected:
             hMenu,
             hInstance,
             &createParam);
+
+        return _hWnd != NULL;
+    }
+
+    bool CreateDlg(
+        HINSTANCE hInstance,
+        LPCWSTR lpTemplateName,
+        HWND hWndParent,
+        LPARAM dwInitParam = 0)
+    {
+        if (_hWnd != NULL) {
+            return false;
+        }
+
+        _CreateParamWrapper initParam{
+            this, reinterpret_cast<LPVOID>(dwInitParam) };
+
+        _defWndProc = DefDlgProcW;
+
+        _hWnd = CreateDialogParamW(
+            hInstance,
+            lpTemplateName,
+            hWndParent,
+            StaticDlgProc,
+            reinterpret_cast<LPARAM>(&initParam));
 
         return _hWnd != NULL;
     }
