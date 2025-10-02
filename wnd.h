@@ -390,6 +390,11 @@ protected:
 #endif
 
 public:
+    Dlg(Dlg&& other) noexcept
+        : TBase(std::move(other))
+    {
+    }
+
     bool EndDialog(INT_PTR nResult)
     {
         TBase& self = *static_cast<TBase*>(this);
