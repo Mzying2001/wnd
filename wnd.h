@@ -106,10 +106,6 @@ private:
 
             bool result =
                 pThis->WndProc(msg, unused);
-
-            if (uMsg == WM_NCDESTROY) {
-                pThis->_destroyed = true;
-            }
             return result;
         }
 
@@ -369,6 +365,15 @@ public:
     LRESULT PostMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
     {
         return ::PostMessageW(_hWnd, uMsg, wParam, lParam);
+    }
+
+    bool EndDialog(INT_PTR nResult)
+    {
+        bool result = ::EndDialog(_hWnd, nResult);
+
+        if (result)
+            _destroyed = true;
+        return result;
     }
 };
 
