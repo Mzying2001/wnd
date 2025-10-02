@@ -304,7 +304,8 @@ private:
         if (pThis == nullptr &&
             uMsg == WM_INITDIALOG)
         {
-            auto* pWrapper = reinterpret_cast<TBase::_CreateParamWrapper*>(lParam);
+            auto* pWrapper = reinterpret_cast<
+                typename TBase::_CreateParamWrapper*>(lParam);
 
             if (pWrapper != nullptr) {
                 pThis = pWrapper->pThis;
@@ -328,8 +329,7 @@ private:
     }
 
 protected:
-    Dlg() noexcept
-        : TBase()
+    Dlg() noexcept : TBase()
     {
     }
 
