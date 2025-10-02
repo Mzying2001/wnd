@@ -23,7 +23,7 @@ class Wnd
     WNDPROC _defWndProc;
 
 private:
-    static constexpr WCHAR PROP_THIS[] = L"__Wnd_This_Ptr";
+    static constexpr WCHAR _PROP_THIS[] = L"__Wnd_This_Ptr";
 
     struct _CreateParamWrapper
     {
@@ -34,12 +34,12 @@ private:
 private:
     static Wnd* GetThisFromHandle(HWND hWnd) noexcept
     {
-        return reinterpret_cast<Wnd*>(::GetPropW(hWnd, PROP_THIS));
+        return reinterpret_cast<Wnd*>(::GetPropW(hWnd, _PROP_THIS));
     }
 
     static bool BindThisToHandle(HWND hWnd, Wnd* pThis) noexcept
     {
-        return ::SetPropW(hWnd, PROP_THIS, reinterpret_cast<HANDLE>(pThis)) != 0;
+        return ::SetPropW(hWnd, _PROP_THIS, reinterpret_cast<HANDLE>(pThis)) != 0;
     }
 
     static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -249,7 +249,7 @@ public:
     {
         if (!_destroyed && _hWnd != NULL)
         {
-            ::RemovePropW(_hWnd, PROP_THIS);
+            ::RemovePropW(_hWnd, _PROP_THIS);
             ::DestroyWindow(_hWnd);
             _hWnd = NULL;
             _destroyed = true;
