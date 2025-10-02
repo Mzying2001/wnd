@@ -49,8 +49,8 @@ private:
         if (pThis == nullptr &&
             (uMsg == WM_NCCREATE || uMsg == WM_CREATE))
         {
-            CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-            _CreateParamWrapper* pWrapper = reinterpret_cast<_CreateParamWrapper*>(pCreate->lpCreateParams);
+            auto* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
+            auto* pWrapper = reinterpret_cast<_CreateParamWrapper*>(pCreate->lpCreateParams);
 
             if (pWrapper != nullptr) {
                 pThis = pWrapper->pThis;
