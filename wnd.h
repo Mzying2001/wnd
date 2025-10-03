@@ -213,7 +213,7 @@ protected:
     }
 #endif
 
-    LRESULT DefWndProc(const Msg& msg)
+    LRESULT DefWndProc(Msg& msg)
     {
 #if defined(WND_USE_ANSI_WINDPROC)
         return _defWndProc != nullptr
@@ -226,7 +226,7 @@ protected:
 #endif
     }
 
-    bool WndProc(const Msg& msg, LRESULT& result)
+    bool WndProc(Msg& msg, LRESULT& result)
     {
         static_assert(&Wnd::WndProc != &TDerived::WndProc,
             "Derived class must implement WndProc method.");
