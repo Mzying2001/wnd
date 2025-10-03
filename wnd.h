@@ -303,7 +303,15 @@ public:
 
     ~Wnd() noexcept
     {
-        if (_hWnd != NULL && !_destroyed) {
+        if (_hWnd != NULL && !_destroyed)
+        {
+#if defined(WND_USE_ANSI_WINDPROC)
+            ::SetWindowLongPtrA(_hWnd, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(_defWndProc ? _defWndProc : ::DefWindowProcA));
+#else
+            ::SetWindowLongPtrW(_hWnd, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(_defWndProc ? _defWndProc : ::DefWindowProcW));
+#endif
             ::RemovePropW(_hWnd, _PROP_THIS);
             ::DestroyWindow(_hWnd);
         }
