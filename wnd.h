@@ -152,7 +152,7 @@ protected:
         return _hWnd != NULL;
     }
 
-    bool AttachHandle(HWND hWnd)
+    bool AttachHandle(HWND hWnd) noexcept
     {
         if (_hWnd != NULL || hWnd == NULL) {
             return false;
@@ -237,7 +237,7 @@ protected:
         return _hWnd != NULL;
     }
 
-    bool AttachHandle(HWND hWnd)
+    bool AttachHandle(HWND hWnd) noexcept
     {
         if (_hWnd != NULL || hWnd == NULL) {
             return false;
@@ -320,12 +320,12 @@ public:
         return _destroyed;
     }
 
-    LRESULT SendMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
+    LRESULT SendMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0)
     {
         return ::SendMessageA(_hWnd, uMsg, wParam, lParam);
     }
 
-    LRESULT SendMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
+    LRESULT SendMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0)
     {
         return ::SendMessageW(_hWnd, uMsg, wParam, lParam);
     }
