@@ -285,8 +285,8 @@ protected:
 
 public:
     Wnd(const Wnd&) = delete;
-    Wnd& operator=(const Wnd&) = delete;
     Wnd& operator=(Wnd&&) = delete;
+    Wnd& operator=(const Wnd&) = delete;
 
     Wnd(Wnd&& other) noexcept
         : _hWnd(other._hWnd), _destroyed(other._destroyed), _defWndProc(other._defWndProc)
