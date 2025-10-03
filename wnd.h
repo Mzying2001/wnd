@@ -455,6 +455,18 @@ public:
     {
     }
 
+    ~Dlg() noexcept
+    {
+        TBase& self = *static_cast<TBase*>(this);
+
+        if (self._hWnd != NULL && !self._destroyed) {
+            ::RemovePropW(self._hWnd, TBase::_PROP_THIS);
+            ::EndDialog(self._hWnd, 0);
+        }
+        self._hWnd = NULL;
+        self._destroyed = true;
+    }
+
     bool EndDialog(INT_PTR nResult) noexcept
     {
         TBase& self = *static_cast<TBase*>(this);
