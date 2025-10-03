@@ -178,6 +178,13 @@ protected:
             reinterpret_cast<LONG_PTR>(StaticWndProc));
         return true;
     }
+
+    LRESULT DefWndProc(Msg& msg)
+    {
+        return _defWndProc != nullptr
+            ? ::CallWindowProcA(_defWndProc, _hWnd, msg.uMsg, msg.wParam, msg.lParam)
+            : ::DefWindowProcA(_hWnd, msg.uMsg, msg.wParam, msg.lParam);
+    }
 #else
     bool CreateHandle(
         DWORD dwExStyle,
@@ -263,20 +270,14 @@ protected:
             reinterpret_cast<LONG_PTR>(StaticWndProc));
         return true;
     }
-#endif
 
     LRESULT DefWndProc(Msg& msg)
     {
-#if defined(WND_USE_ANSI_WINDPROC)
-        return _defWndProc != nullptr
-            ? ::CallWindowProcA(_defWndProc, _hWnd, msg.uMsg, msg.wParam, msg.lParam)
-            : ::DefWindowProcA(_hWnd, msg.uMsg, msg.wParam, msg.lParam);
-#else
         return _defWndProc != nullptr
             ? ::CallWindowProcW(_defWndProc, _hWnd, msg.uMsg, msg.wParam, msg.lParam)
             : ::DefWindowProcW(_hWnd, msg.uMsg, msg.wParam, msg.lParam);
-#endif
     }
+#endif
 
     bool WndProc(Msg& msg, LRESULT& result)
     {
