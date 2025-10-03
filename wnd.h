@@ -315,7 +315,6 @@ public:
             ::RemovePropW(_hWnd, _PROP_THIS);
             ::DestroyWindow(_hWnd);
         }
-        _hWnd = NULL;
         _destroyed = true;
     }
 
@@ -463,7 +462,6 @@ public:
             ::RemovePropW(self._hWnd, TBase::_PROP_THIS);
             ::EndDialog(self._hWnd, 0);
         }
-        self._hWnd = NULL;
         self._destroyed = true;
     }
 
