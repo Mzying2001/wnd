@@ -329,12 +329,12 @@ public:
         return ::SendMessageW(_hWnd, uMsg, wParam, lParam);
     }
 
-    LRESULT PostMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
+    BOOL PostMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
     {
         return ::PostMessageA(_hWnd, uMsg, wParam, lParam);
     }
 
-    LRESULT PostMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
+    BOOL PostMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
     {
         return ::PostMessageW(_hWnd, uMsg, wParam, lParam);
     }
