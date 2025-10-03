@@ -151,6 +151,31 @@ protected:
 
         return _hWnd != NULL;
     }
+
+    bool AttachHandle(HWND hWnd)
+    {
+        if (_hWnd != NULL || hWnd == NULL) {
+            return false;
+        }
+
+        if (!BindThisToHandle(hWnd, this)) {
+            return false;
+        }
+
+        WNDPROC proc = reinterpret_cast<WNDPROC>(
+            ::GetWindowLongPtrA(hWnd, GWLP_WNDPROC));
+
+        if (proc == StaticWndProc) {
+            return false;
+        }
+
+        _hWnd = hWnd;
+        _defWndProc = proc;
+
+        ::SetWindowLongPtrA(hWnd, GWLP_WNDPROC,
+            reinterpret_cast<LONG_PTR>(StaticWndProc));
+        return true;
+    }
 #else
     bool CreateHandle(
         DWORD dwExStyle,
@@ -210,6 +235,31 @@ protected:
             &createParam);
 
         return _hWnd != NULL;
+    }
+
+    bool AttachHandle(HWND hWnd)
+    {
+        if (_hWnd != NULL || hWnd == NULL) {
+            return false;
+        }
+
+        if (!BindThisToHandle(hWnd, this)) {
+            return false;
+        }
+
+        WNDPROC proc = reinterpret_cast<WNDPROC>(
+            ::GetWindowLongPtrW(hWnd, GWLP_WNDPROC));
+
+        if (proc == StaticWndProc) {
+            return false;
+        }
+
+        _hWnd = hWnd;
+        _defWndProc = proc;
+
+        ::SetWindowLongPtrW(hWnd, GWLP_WNDPROC,
+            reinterpret_cast<LONG_PTR>(StaticWndProc));
+        return true;
     }
 #endif
 
