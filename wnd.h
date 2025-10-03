@@ -388,7 +388,7 @@ protected:
         HINSTANCE hInstance,
         LPCSTR lpTemplateName,
         HWND hWndParent,
-        LPARAM dwInitParam = 0)
+        LPARAM dwInitParam = 0) noexcept
     {
         TBase& self = *static_cast<TBase*>(this);
 
@@ -415,7 +415,7 @@ protected:
         HINSTANCE hInstance,
         LPCWSTR lpTemplateName,
         HWND hWndParent,
-        LPARAM dwInitParam = 0)
+        LPARAM dwInitParam = 0) noexcept
     {
         TBase& self = *static_cast<TBase*>(this);
 
@@ -445,7 +445,7 @@ public:
     {
     }
 
-    bool EndDialog(INT_PTR nResult)
+    bool EndDialog(INT_PTR nResult) noexcept
     {
         TBase& self = *static_cast<TBase*>(this);
         bool result = ::EndDialog(self._hWnd, nResult);
