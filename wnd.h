@@ -22,8 +22,8 @@ class Wnd
     friend class Dlg;
 
     HWND    _hWnd;
-    bool    _destroyed;
     WNDPROC _defWndProc;
+    bool    _destroyed;
 
 private:
     static constexpr WCHAR
@@ -89,7 +89,7 @@ private:
 
 protected:
     Wnd() noexcept
-        : _hWnd(NULL), _destroyed(false), _defWndProc(NULL)
+        : _hWnd(NULL), _defWndProc(NULL), _destroyed(false)
     {
     }
 
@@ -291,14 +291,14 @@ public:
     Wnd& operator=(const Wnd&) = delete;
 
     Wnd(Wnd&& other) noexcept
-        : _hWnd(other._hWnd), _destroyed(other._destroyed), _defWndProc(other._defWndProc)
+        : _hWnd(other._hWnd), _defWndProc(other._defWndProc), _destroyed(other._destroyed)
     {
         if (_hWnd != NULL && !_destroyed) {
             BindThisToHandle(_hWnd, this);
         }
         other._hWnd = NULL;
-        other._destroyed = true;
-        other._defWndProc = NULL;
+        other._defWndProc = nullptr;
+        other._destroyed = false;
     }
 
     ~Wnd() noexcept
