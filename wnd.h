@@ -10,9 +10,9 @@
 
 struct Msg
 {
-    UINT    uMsg;
-    WPARAM  wParam;
-    LPARAM  lParam;
+    UINT   uMsg;
+    WPARAM wParam;
+    LPARAM lParam;
 };
 
 template <typename TDerived>
@@ -29,7 +29,7 @@ private:
     static constexpr WCHAR
         _PROP_THIS[] = L"__Wnd_This_Ptr";
 
-    struct _CreateParamWrapper
+    struct _CreateParam
     {
         Wnd* pThis;
         LPVOID lpParam;
@@ -54,13 +54,13 @@ private:
             (uMsg == WM_NCCREATE || uMsg == WM_CREATE))
         {
             auto* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-            auto* pWrapper = reinterpret_cast<_CreateParamWrapper*>(pCreate->lpCreateParams);
+            auto* pParam = reinterpret_cast<_CreateParam*>(pCreate->lpCreateParams);
 
-            if (pWrapper != nullptr) {
-                pThis = pWrapper->pThis;
+            if (pParam != nullptr) {
+                pThis = pParam->pThis;
                 pThis->_hWnd = hWnd;
                 BindThisToHandle(hWnd, pThis);
-                pCreate->lpCreateParams = pWrapper->lpParam;
+                pCreate->lpCreateParams = pParam->lpParam;
             }
         }
 
@@ -133,7 +133,7 @@ protected:
             }
         }
 
-        _CreateParamWrapper createParam = { this, lpParam };
+        _CreateParam createParam = { this, lpParam };
 
         _hWnd = ::CreateWindowExA(
             dwExStyle,
@@ -193,7 +193,7 @@ protected:
             }
         }
 
-        _CreateParamWrapper createParam = { this, lpParam };
+        _CreateParam createParam = { this, lpParam };
 
         _hWnd = ::CreateWindowExW(
             dwExStyle,
@@ -230,7 +230,7 @@ protected:
     {
         static_assert(&Wnd::WndProc != &TDerived::WndProc,
             "Derived class must implement WndProc method.");
-        return static_cast<TDerived*>(this)->TDerived::WndProc(msg, result);
+        return static_cast<TDerived*>(this)->WndProc(msg, result);
     }
 
 public:
@@ -304,14 +304,14 @@ private:
         if (pThis == nullptr &&
             uMsg == WM_INITDIALOG)
         {
-            auto* pWrapper = reinterpret_cast<
-                typename TBase::_CreateParamWrapper*>(lParam);
+            auto* pParam = reinterpret_cast<
+                typename TBase::_CreateParam*>(lParam);
 
-            if (pWrapper != nullptr) {
-                pThis = pWrapper->pThis;
+            if (pParam != nullptr) {
+                pThis = pParam->pThis;
                 pThis->_hWnd = hDlg;
                 TBase::BindThisToHandle(hDlg, pThis);
-                lParam = reinterpret_cast<LPARAM>(pWrapper->lpParam);
+                lParam = reinterpret_cast<LPARAM>(pParam->lpParam);
             }
         }
 
@@ -346,7 +346,7 @@ protected:
             return false;
         }
 
-        typename TBase::_CreateParamWrapper initParam{
+        typename TBase::_CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
         self._defWndProc = ::DefDlgProcA;
@@ -373,7 +373,7 @@ protected:
             return false;
         }
 
-        typename TBase::_CreateParamWrapper initParam{
+        typename TBase::_CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
         self._defWndProc = ::DefDlgProcW;
