@@ -429,7 +429,7 @@ protected:
         TBase& self = *static_cast<TBase*>(this);
 
         if (self._hWnd != NULL) {
-            return false;
+            return static_cast<INT_PTR>(-1);
         }
 
         self._defWndProc = ::DefDlgProcA;
@@ -481,7 +481,7 @@ protected:
         TBase& self = *static_cast<TBase*>(this);
 
         if (self._hWnd != NULL) {
-            return false;
+            return static_cast<INT_PTR>(-1);
         }
 
         self._defWndProc = ::DefDlgProcW;
