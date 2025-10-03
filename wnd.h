@@ -50,16 +50,18 @@ private:
     {
         Wnd* pThis = GetThisFromHandle(hWnd);
 
-        if (pThis == nullptr &&
-            (uMsg == WM_NCCREATE || uMsg == WM_CREATE))
+        if ((uMsg == WM_NCCREATE || uMsg == WM_CREATE) && lParam != 0)
         {
             auto* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
             auto* pParam = reinterpret_cast<_CreateParam*>(pCreate->lpCreateParams);
 
-            if (pParam != nullptr) {
-                pThis = pParam->pThis;
-                pThis->_hWnd = hWnd;
-                BindThisToHandle(hWnd, pThis);
+            if (pParam != nullptr)
+            {
+                if (pThis == nullptr) {
+                    pThis = pParam->pThis;
+                    pThis->_hWnd = hWnd;
+                    BindThisToHandle(hWnd, pThis);
+                }
                 pCreate->lpCreateParams = pParam->lpParam;
             }
         }
