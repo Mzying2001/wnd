@@ -380,6 +380,10 @@ private:
 
             bool result =
                 pThis->WndProc(msg, unused);
+
+            if (uMsg == WM_NCDESTROY) {
+                pThis->_destroyed = true;
+            }
             return result;
         }
 
