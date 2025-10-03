@@ -405,12 +405,12 @@ protected:
             return false;
         }
 
+        self._defWndProc = ::DefDlgProcA;
+
         typename TBase::_CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
-        self._defWndProc = ::DefDlgProcA;
-
-        self._hWnd = ::CreateDialogParamA(
+        ::CreateDialogParamA(
             hInstance,
             lpTemplateName,
             hWndParent,
@@ -418,6 +418,31 @@ protected:
             reinterpret_cast<LPARAM>(&initParam));
 
         return self._hWnd != NULL;
+    }
+
+    INT_PTR CreateModal(
+        HINSTANCE hInstance,
+        LPCWSTR lpTemplateName,
+        HWND hWndParent,
+        LPARAM dwInitParam = 0) noexcept
+    {
+        TBase& self = *static_cast<TBase*>(this);
+
+        if (self._hWnd != NULL) {
+            return false;
+        }
+
+        self._defWndProc = ::DefDlgProcA;
+
+        typename TBase::_CreateParam initParam{
+            this, reinterpret_cast<LPVOID>(dwInitParam) };
+
+        return ::DialogBoxParamA(
+            hInstance,
+            lpTemplateName,
+            hWndParent,
+            StaticDlgProc,
+            reinterpret_cast<LPARAM>(&initParam));
     }
 #else
     bool CreateDlg(
@@ -432,12 +457,12 @@ protected:
             return false;
         }
 
+        self._defWndProc = ::DefDlgProcW;
+
         typename TBase::_CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
-        self._defWndProc = ::DefDlgProcW;
-
-        self._hWnd = ::CreateDialogParamW(
+        ::CreateDialogParamW(
             hInstance,
             lpTemplateName,
             hWndParent,
@@ -445,6 +470,31 @@ protected:
             reinterpret_cast<LPARAM>(&initParam));
 
         return self._hWnd != NULL;
+    }
+
+    INT_PTR CreateModal(
+        HINSTANCE hInstance,
+        LPCWSTR lpTemplateName,
+        HWND hWndParent,
+        LPARAM dwInitParam = 0) noexcept
+    {
+        TBase& self = *static_cast<TBase*>(this);
+
+        if (self._hWnd != NULL) {
+            return false;
+        }
+
+        self._defWndProc = ::DefDlgProcW;
+
+        typename TBase::_CreateParam initParam{
+            this, reinterpret_cast<LPVOID>(dwInitParam) };
+
+        return ::DialogBoxParamW(
+            hInstance,
+            lpTemplateName,
+            hWndParent,
+            StaticDlgProc,
+            reinterpret_cast<LPARAM>(&initParam));
     }
 #endif
 
