@@ -291,7 +291,7 @@ public:
     Wnd(Wnd&& other) noexcept
         : _hWnd(other._hWnd), _destroyed(other._destroyed), _defWndProc(other._defWndProc)
     {
-        if (!_destroyed && _hWnd != NULL) {
+        if (_hWnd != NULL && !_destroyed) {
             BindThisToHandle(_hWnd, this);
         }
         other._hWnd = NULL;
