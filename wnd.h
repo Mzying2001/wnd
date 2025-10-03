@@ -301,13 +301,12 @@ public:
 
     ~Wnd() noexcept
     {
-        if (!_destroyed && _hWnd != NULL)
-        {
+        if (_hWnd != NULL && !_destroyed) {
             ::RemovePropW(_hWnd, _PROP_THIS);
             ::DestroyWindow(_hWnd);
-            _hWnd = NULL;
-            _destroyed = true;
         }
+        _hWnd = NULL;
+        _destroyed = true;
     }
 
     HWND Handle() const noexcept
@@ -379,7 +378,8 @@ private:
     }
 
 protected:
-    Dlg() noexcept : TBase()
+    Dlg() noexcept
+        : TBase()
     {
     }
 
