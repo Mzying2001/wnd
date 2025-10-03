@@ -535,15 +535,10 @@ public:
         return _isModal;
     }
 
-    bool EndDialog(INT_PTR nResult) noexcept
+    bool DestroyDlg(INT_PTR nResult = 0) noexcept
     {
         TBase& self = *static_cast<TBase*>(this);
-        bool result = ::EndDialog(self._hWnd, nResult);
-
-        if (result) {
-            self._destroyed = true;
-        }
-        return result;
+        return _isModal ? ::EndDialog(self._hWnd, nResult) : ::DestroyWindow(self._hWnd);
     }
 };
 
