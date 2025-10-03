@@ -414,6 +414,7 @@ protected:
             return false;
         }
 
+        _isModal = false;
         self._defWndProc = ::DefDlgProcA;
 
         typename TBase::_CreateParam initParam{
@@ -441,6 +442,7 @@ protected:
             return static_cast<INT_PTR>(-1);
         }
 
+        _isModal = true;
         self._defWndProc = ::DefDlgProcA;
 
         typename TBase::_CreateParam initParam{
@@ -466,6 +468,7 @@ protected:
             return false;
         }
 
+        _isModal = false;
         self._defWndProc = ::DefDlgProcW;
 
         typename TBase::_CreateParam initParam{
@@ -493,6 +496,7 @@ protected:
             return static_cast<INT_PTR>(-1);
         }
 
+        _isModal = true;
         self._defWndProc = ::DefDlgProcW;
 
         typename TBase::_CreateParam initParam{
@@ -511,17 +515,24 @@ public:
     Dlg(Dlg&& other) noexcept
         : TBase(std::move(other)), _isModal(other._isModal), _reserved{}
     {
+        other._isModal = false;
     }
 
     ~Dlg() noexcept
     {
         TBase& self = *static_cast<TBase*>(this);
 
-        if (self._hWnd != NULL && !self._destroyed) {
+        if (self._hWnd != NULL && !self._destroyed)
+        {
             ::RemovePropW(self._hWnd, TBase::_PROP_THIS);
-            ::EndDialog(self._hWnd, 0);
+            _isModal ? ::EndDialog(self._hWnd, 0) : ::DestroyWindow(self._hWnd);
         }
         self._destroyed = true;
+    }
+
+    bool IsModal() const noexcept
+    {
+        return _isModal;
     }
 
     bool EndDialog(INT_PTR nResult) noexcept
