@@ -39,7 +39,12 @@ private:
 private:
     static Wnd* GetThisFromHandle(HWND hWnd) noexcept
     {
-        return reinterpret_cast<Wnd*>(::GetPropW(hWnd, _PROP_THIS));
+        static struct _AtomRaiiHelper {
+            ATOM value;
+            _AtomRaiiHelper() noexcept : value(::GlobalAddAtomW(_PROP_THIS)) {}
+            ~_AtomRaiiHelper() noexcept { if (value != 0) ::GlobalDeleteAtom(value); }
+        } _atom;
+        return reinterpret_cast<Wnd*>(::GetProp(hWnd, MAKEINTATOM(_atom.value)));
     }
 
     static bool BindThisToHandle(HWND hWnd, Wnd* pThis) noexcept
