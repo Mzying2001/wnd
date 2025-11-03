@@ -185,7 +185,7 @@ protected:
         return true;
     }
 
-    LRESULT DefWndProc(Msg& msg)
+    LRESULT DefWndProc(const Msg& msg)
     {
         return _defWndProc != nullptr
             ? ::CallWindowProcA(_defWndProc, _hWnd, msg.uMsg, msg.wParam, msg.lParam)
@@ -277,7 +277,7 @@ protected:
         return true;
     }
 
-    LRESULT DefWndProc(Msg& msg)
+    LRESULT DefWndProc(const Msg& msg)
     {
         return _defWndProc != nullptr
             ? ::CallWindowProcW(_defWndProc, _hWnd, msg.uMsg, msg.wParam, msg.lParam)
