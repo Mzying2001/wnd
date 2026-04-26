@@ -522,6 +522,10 @@ protected:
 #endif
 
 public:
+    Dlg(const Dlg&) = delete;
+    Dlg& operator=(Dlg&&) = delete;
+    Dlg& operator=(const Dlg&) = delete;
+
     Dlg(Dlg&& other) noexcept
         : TBase(std::move(other)), _isModal(other._isModal)
     {
