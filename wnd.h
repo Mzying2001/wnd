@@ -127,9 +127,8 @@ protected:
         if (!::GetClassInfoExA(hInstance, lpClassName, &wc)) {
             return false;
         }
-        else {
-            _defWndProc = wc.lpfnWndProc;
-        }
+
+        _defWndProc = wc.lpfnWndProc;
 
         std::string className = lpClassName;
         className += "_Wnd_Class";
@@ -140,6 +139,7 @@ protected:
             wc.lpszClassName = className.c_str();
 
             if (!::RegisterClassExA(&wc)) {
+                _defWndProc = nullptr;
                 return false;
             }
         }
@@ -164,6 +164,7 @@ protected:
             _owned = true;
             return true;
         }
+        _defWndProc = nullptr;
         return false;
     }
 
@@ -224,9 +225,8 @@ protected:
         if (!::GetClassInfoExW(hInstance, lpClassName, &wc)) {
             return false;
         }
-        else {
-            _defWndProc = wc.lpfnWndProc;
-        }
+
+        _defWndProc = wc.lpfnWndProc;
 
         std::wstring className = lpClassName;
         className += L"_Wnd_Class";
@@ -237,6 +237,7 @@ protected:
             wc.lpszClassName = className.c_str();
 
             if (!::RegisterClassExW(&wc)) {
+                _defWndProc = nullptr;
                 return false;
             }
         }
@@ -261,6 +262,7 @@ protected:
             _owned = true;
             return true;
         }
+        _defWndProc = nullptr;
         return false;
     }
 
