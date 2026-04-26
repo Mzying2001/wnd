@@ -16,8 +16,10 @@
  * below for the full selection rules.
  */
 
-#ifndef _WND_H_
-#define _WND_H_
+#pragma once
+
+#ifndef WND_H_INCLUDED
+#define WND_H_INCLUDED
 
 #include <windows.h>
 #include <cstdint>
@@ -1095,4 +1097,4 @@ public:
     }
 };
 
-#endif // !_WND_H_
+#endif // !WND_H_INCLUDED
