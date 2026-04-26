@@ -82,8 +82,20 @@ private:
             Msg msg{ uMsg, wParam, lParam };
             LRESULT result = 0;
 
-            if (!pThis->WndProc(msg, result)) {
+            bool handled = pThis->WndProc(msg, result);
+
+            if (GetThisFromHandle(hWnd) != pThis) {
+#if defined(WND_USE_ANSI_WINDPROC)
+                return ::DefWindowProcA(hWnd, uMsg, wParam, lParam);
+#else
+                return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
+#endif
+            }
+            if (!handled) {
                 result = pThis->DefWndProc(msg);
+                if (GetThisFromHandle(hWnd) != pThis) {
+                    return result;
+                }
             }
             if (uMsg == WM_NCDESTROY) {
                 pThis->_destroyed = true;
