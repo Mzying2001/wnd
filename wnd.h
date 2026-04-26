@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <type_traits>
 
 #if !(defined(UNICODE) || defined(_UNICODE))
 #define WND_USE_ANSI_WINDPROC
