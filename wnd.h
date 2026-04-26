@@ -27,9 +27,9 @@ class Wnd
     bool    _destroyed;
 
 private:
-    static constexpr LPCWSTR _PROP_THIS() noexcept
+    static constexpr LPCTSTR _PROP_THIS() noexcept
     {
-        return L"__Wnd_This_Ptr";
+        return TEXT("__Wnd_This_Ptr");
     }
 
     struct _CreateParam
@@ -43,7 +43,7 @@ private:
     {
         static struct _AtomRaiiHelper {
             ATOM value;
-            _AtomRaiiHelper() noexcept : value(::GlobalAddAtomW(_PROP_THIS())) {}
+            _AtomRaiiHelper() noexcept : value(::GlobalAddAtom(_PROP_THIS())) {}
             ~_AtomRaiiHelper() noexcept { if (value != 0) ::GlobalDeleteAtom(value); }
         } _atom;
         return reinterpret_cast<Wnd*>(::GetProp(hWnd, MAKEINTATOM(_atom.value)));
@@ -51,7 +51,7 @@ private:
 
     static bool BindThisToHandle(HWND hWnd, Wnd* pThis) noexcept
     {
-        return ::SetPropW(hWnd, _PROP_THIS(), reinterpret_cast<HANDLE>(pThis)) != 0;
+        return ::SetProp(hWnd, _PROP_THIS(), reinterpret_cast<HANDLE>(pThis)) != 0;
     }
 
     static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -325,7 +325,7 @@ public:
             ::SetWindowLongPtrW(_hWnd, GWLP_WNDPROC,
                 reinterpret_cast<LONG_PTR>(_defWndProc ? _defWndProc : ::DefWindowProcW));
 #endif
-            ::RemovePropW(_hWnd, _PROP_THIS());
+            ::RemoveProp(_hWnd, _PROP_THIS());
             ::DestroyWindow(_hWnd);
         }
         _destroyed = true;
@@ -534,7 +534,7 @@ public:
 
         if (self._hWnd != NULL && !self._destroyed)
         {
-            ::RemovePropW(self._hWnd, TBase::_PROP_THIS());
+            ::RemoveProp(self._hWnd, TBase::_PROP_THIS());
             _isModal ? ::EndDialog(self._hWnd, 0) : ::DestroyWindow(self._hWnd);
         }
         self._destroyed = true;
