@@ -442,7 +442,7 @@ protected:
 
     INT_PTR CreateModal(
         HINSTANCE hInstance,
-        LPCWSTR lpTemplateName,
+        LPCSTR lpTemplateName,
         HWND hWndParent,
         LPARAM dwInitParam = 0) noexcept
     {
