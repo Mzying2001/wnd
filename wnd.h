@@ -391,15 +391,19 @@ private:
         if (pThis != nullptr)
         {
             Msg msg{ uMsg, wParam, lParam };
-            LRESULT unused = 0;
+            LRESULT lResult = 0;
 
-            bool result =
-                pThis->WndProc(msg, unused);
+            bool handled =
+                pThis->WndProc(msg, lResult);
 
             if (uMsg == WM_NCDESTROY) {
                 pThis->_destroyed = true;
             }
-            return result;
+            if (handled) {
+                ::SetWindowLongPtr(hDlg, DWLP_MSGRESULT, static_cast<LONG_PTR>(lResult));
+                return TRUE;
+            }
+            return FALSE;
         }
 
         return FALSE;
