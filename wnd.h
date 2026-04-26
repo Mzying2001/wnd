@@ -99,6 +99,7 @@ private:
             }
             if (uMsg == WM_NCDESTROY) {
                 pThis->_destroyed = true;
+                ::RemoveProp(hWnd, _PROP_THIS());
             }
             return result;
         }
@@ -442,6 +443,7 @@ private:
 
             if (uMsg == WM_NCDESTROY) {
                 pThis->_destroyed = true;
+                ::RemoveProp(hDlg, TBase::_PROP_THIS());
             }
             if (handled) {
                 ::SetWindowLongPtr(hDlg, DWLP_MSGRESULT, static_cast<LONG_PTR>(lResult));
