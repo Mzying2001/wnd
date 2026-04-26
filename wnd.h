@@ -173,14 +173,14 @@ protected:
             return false;
         }
 
-        if (!BindThisToHandle(hWnd, this)) {
-            return false;
-        }
-
         WNDPROC proc = reinterpret_cast<WNDPROC>(
             ::GetWindowLongPtrA(hWnd, GWLP_WNDPROC));
 
-        if (proc == StaticWndProc) {
+        if (proc == StaticWndProc || GetThisFromHandle(hWnd) != nullptr) {
+            return false;
+        }
+
+        if (!BindThisToHandle(hWnd, this)) {
             return false;
         }
 
@@ -272,14 +272,14 @@ protected:
             return false;
         }
 
-        if (!BindThisToHandle(hWnd, this)) {
-            return false;
-        }
-
         WNDPROC proc = reinterpret_cast<WNDPROC>(
             ::GetWindowLongPtrW(hWnd, GWLP_WNDPROC));
 
-        if (proc == StaticWndProc) {
+        if (proc == StaticWndProc || GetThisFromHandle(hWnd) != nullptr) {
+            return false;
+        }
+
+        if (!BindThisToHandle(hWnd, this)) {
             return false;
         }
 
