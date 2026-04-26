@@ -588,8 +588,12 @@ public:
 
         if (self._hWnd != NULL && !self._destroyed)
         {
-            ::RemoveProp(self._hWnd, TBase::_PROP_THIS());
-            _isModal ? ::EndDialog(self._hWnd, 0) : ::DestroyWindow(self._hWnd);
+            if (_isModal) {
+                ::EndDialog(self._hWnd, 0);
+            }
+            else {
+                ::DestroyWindow(self._hWnd);
+            }
         }
         self._destroyed = true;
     }
