@@ -323,7 +323,7 @@ protected:
             std::is_base_of<Wnd<TDerived>, TDerived>::value,
             "TDerived must derive from Wnd<TDerived> (CRTP)");
         
-            static_assert(
+        static_assert(
             std::is_same<
                 bool (TDerived::*)(Msg&, LRESULT&),
                 decltype(static_cast<bool (TDerived::*)(Msg&, LRESULT&)>(&TDerived::WndProc))>::value,
@@ -365,6 +365,12 @@ public:
     {
         if (_hWnd != NULL && !_destroyed)
         {
+#if !defined(NDEBUG)
+            DWORD wndTid = ::GetWindowThreadProcessId(_hWnd, nullptr);
+            if (wndTid != 0 && wndTid != ::GetCurrentThreadId()) {
+                ::OutputDebugString(TEXT("[Wnd] WARNING: destructor invoked on non-creator thread\n"));
+            }
+#endif
 #if defined(WND_USE_ANSI_WINDPROC)
             ::SetWindowLongPtrA(_hWnd, GWLP_WNDPROC,
                 reinterpret_cast<LONG_PTR>(_defWndProc ? _defWndProc : ::DefWindowProcA));
