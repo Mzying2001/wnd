@@ -25,6 +25,7 @@ class Wnd
     HWND    _hWnd;
     WNDPROC _defWndProc;
     bool    _destroyed;
+    bool    _owned;
 
 private:
     static constexpr LPCTSTR _PROP_THIS() noexcept
@@ -97,7 +98,7 @@ private:
 
 protected:
     Wnd() noexcept
-        : _hWnd(NULL), _defWndProc(NULL), _destroyed(false)
+        : _hWnd(NULL), _defWndProc(NULL), _destroyed(false), _owned(false)
     {
     }
 
@@ -159,7 +160,11 @@ protected:
             hInstance,
             &createParam);
 
-        return _hWnd != NULL;
+        if (_hWnd != NULL) {
+            _owned = true;
+            return true;
+        }
+        return false;
     }
 
     bool AttachHandle(HWND hWnd) noexcept
@@ -181,6 +186,7 @@ protected:
 
         _hWnd = hWnd;
         _defWndProc = proc;
+        _owned = false;
 
         ::SetWindowLongPtrA(hWnd, GWLP_WNDPROC,
             reinterpret_cast<LONG_PTR>(StaticWndProc));
@@ -251,7 +257,11 @@ protected:
             hInstance,
             &createParam);
 
-        return _hWnd != NULL;
+        if (_hWnd != NULL) {
+            _owned = true;
+            return true;
+        }
+        return false;
     }
 
     bool AttachHandle(HWND hWnd) noexcept
@@ -273,6 +283,7 @@ protected:
 
         _hWnd = hWnd;
         _defWndProc = proc;
+        _owned = false;
 
         ::SetWindowLongPtrW(hWnd, GWLP_WNDPROC,
             reinterpret_cast<LONG_PTR>(StaticWndProc));
@@ -304,7 +315,7 @@ public:
     Wnd& operator=(const Wnd&) = delete;
 
     Wnd(Wnd&& other) noexcept
-        : _hWnd(other._hWnd), _defWndProc(other._defWndProc), _destroyed(other._destroyed)
+        : _hWnd(other._hWnd), _defWndProc(other._defWndProc), _destroyed(other._destroyed), _owned(other._owned)
     {
         if (_hWnd != NULL && !_destroyed) {
             BindThisToHandle(_hWnd, this);
@@ -312,6 +323,7 @@ public:
         other._hWnd = NULL;
         other._defWndProc = nullptr;
         other._destroyed = false;
+        other._owned = false;
     }
 
     ~Wnd() noexcept
@@ -326,7 +338,9 @@ public:
                 reinterpret_cast<LONG_PTR>(_defWndProc ? _defWndProc : ::DefWindowProcW));
 #endif
             ::RemoveProp(_hWnd, _PROP_THIS());
-            ::DestroyWindow(_hWnd);
+            if (_owned) {
+                ::DestroyWindow(_hWnd);
+            }
         }
         _destroyed = true;
     }
