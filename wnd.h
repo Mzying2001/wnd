@@ -20,6 +20,7 @@
 #define _WND_H_
 
 #include <windows.h>
+#include <cstdint>
 #include <string>
 #include <type_traits>
 
@@ -336,11 +337,16 @@ protected:
 
         _defWndProc = wc.lpfnWndProc;
 
+        // The address of StaticWndProc is unique per Wnd<T> instantiation, so
+        // appending it makes the registered class name unique per T. Without
+        // it, two Wnd<A>/Wnd<B> subclassing the same base would share one
+        // registration and dispatch through the wrong StaticWndProc.
         std::string className = lpClassName;
-        className += "_Wnd_Class";
+        className += "_Wnd_Class_";
+        className += std::to_string(reinterpret_cast<std::uintptr_t>(&StaticWndProc));
 
-        // Register the derived "<base>_Wnd_Class" once per process. If it
-        // already exists, GetClassInfoEx populates `wc` and we skip re-reg.
+        // Register the derived class once per process. If it already exists,
+        // GetClassInfoEx populates `wc` and we skip re-reg.
         if (!::GetClassInfoExA(hInstance, className.c_str(), &wc))
         {
             wc.lpfnWndProc = StaticWndProc;
@@ -469,11 +475,16 @@ protected:
 
         _defWndProc = wc.lpfnWndProc;
 
+        // The address of StaticWndProc is unique per Wnd<T> instantiation, so
+        // appending it makes the registered class name unique per T. Without
+        // it, two Wnd<A>/Wnd<B> subclassing the same base would share one
+        // registration and dispatch through the wrong StaticWndProc.
         std::wstring className = lpClassName;
-        className += L"_Wnd_Class";
+        className += L"_Wnd_Class_";
+        className += std::to_wstring(reinterpret_cast<std::uintptr_t>(&StaticWndProc));
 
-        // Register the derived "<base>_Wnd_Class" once per process. If it
-        // already exists, GetClassInfoEx populates `wc` and we skip re-reg.
+        // Register the derived class once per process. If it already exists,
+        // GetClassInfoEx populates `wc` and we skip re-reg.
         if (!::GetClassInfoExW(hInstance, className.c_str(), &wc))
         {
             wc.lpfnWndProc = StaticWndProc;
