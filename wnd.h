@@ -68,7 +68,11 @@ private:
             {
                 pThis = pParam->pThis;
                 pThis->_hWnd = hWnd;
-                BindThisToHandle(hWnd, pThis);
+                if (!BindThisToHandle(hWnd, pThis)) {
+                    pThis->_hWnd = NULL;
+                    pCreate->lpCreateParams = pParam->lpParam;
+                    return FALSE;
+                }
                 pCreate->lpCreateParams = pParam->lpParam;
             }
         }
