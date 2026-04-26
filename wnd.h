@@ -137,6 +137,7 @@ protected:
         {
             wc.lpfnWndProc = StaticWndProc;
             wc.lpszClassName = className.c_str();
+            wc.hInstance = hInstance;
 
             if (!::RegisterClassExA(&wc)) {
                 _defWndProc = nullptr;
@@ -235,6 +236,7 @@ protected:
         {
             wc.lpfnWndProc = StaticWndProc;
             wc.lpszClassName = className.c_str();
+            wc.hInstance = hInstance;
 
             if (!::RegisterClassExW(&wc)) {
                 _defWndProc = nullptr;
