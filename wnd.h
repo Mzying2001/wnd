@@ -287,9 +287,13 @@ protected:
 
     bool WndProc(Msg& msg, LRESULT& result)
     {
-        static_assert(&Wnd::WndProc != &TDerived::WndProc,
-            "Derived class must implement WndProc method.");
-        return static_cast<TDerived*>(this)->WndProc(msg, result);
+        static_assert(
+            !std::is_same<
+                decltype(&Wnd<TDerived>::WndProc),
+                decltype(&TDerived::WndProc)>::value,
+            "TDerived must implement WndProc method with signature: bool WndProc(Msg& msg, LRESULT& result)");
+
+        return static_cast<TDerived *>(this)->WndProc(msg, result);
     }
 
 public:
