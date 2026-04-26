@@ -417,6 +417,13 @@ public:
     }
 };
 
+// TDerived's WndProc(Msg&, LRESULT&) is reused for dialogs. The two
+// channels are mapped to DLGPROC convention: returning true makes
+// StaticDlgProc forward `result` via DWLP_MSGRESULT and return TRUE,
+// returning false yields FALSE so the dialog manager handles the
+// message. Set `result` for messages that need an LRESULT
+// (WM_CTLCOLOR*, WM_INITDIALOG returning false to keep custom focus,
+// WM_COMPAREITEM, WM_CHARTOITEM, WM_VKEYTOITEM, WM_QUERYDRAGICON, ...).
 template <typename TDerived>
 class Dlg : public Wnd<TDerived>
 {
