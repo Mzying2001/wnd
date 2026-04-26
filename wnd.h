@@ -8,10 +8,12 @@
  * handle window-class registration, subclassing, prop-table dispatch and
  * lifetime management.
  *
- * Character-set selection follows the standard `UNICODE` / `_UNICODE` macros.
- * When neither is defined, the macro `WND_USE_ANSI_WINDPROC` is set internally
- * and every Win32 call resolves to its ANSI variant; otherwise the Unicode
- * variant is used. The same `Wnd` / `Dlg` templates work in both modes.
+ * Character-set selection: defining `WND_USE_ANSI_API` or
+ * `WND_USE_UNICODE_API` before including this header forces the corresponding
+ * Win32 variants (the two are mutually exclusive). Without an explicit choice,
+ * the header falls back to the ambient `UNICODE` / `_UNICODE` macros and uses
+ * ANSI when neither is defined. See the `WND_USE_ANSI_API` documentation
+ * below for the full selection rules.
  */
 
 #ifndef _WND_H_
@@ -21,14 +23,34 @@
 #include <string>
 #include <type_traits>
 
-#if !(defined(UNICODE) || defined(_UNICODE))
 /**
- * @def WND_USE_ANSI_WINDPROC
- * @brief Defined automatically when the project is built without `UNICODE`.
+ * @def WND_USE_ANSI_API
+ * @brief When defined (either by the user or auto-detected from `UNICODE` /
+ *        `_UNICODE`), switches every Win32 dispatch in this header to the
+ *        ANSI (`*A`) variant. Otherwise the Unicode (`*W`) variant is used.
  *
- * Switches every Win32 dispatch in this header to the ANSI (`*A`) variant.
+ * Selection rules, in priority order:
+ *  1. If the user defines `WND_USE_ANSI_API` and `WND_USE_UNICODE_API`
+ *     simultaneously, a compile error is emitted — the choice is mutually
+ *     exclusive.
+ *  2. If exactly one of `WND_USE_ANSI_API` / `WND_USE_UNICODE_API` is
+ *     defined by the user, that selection is honoured.
+ *  3. Otherwise the header falls back to inspecting `UNICODE` / `_UNICODE`:
+ *     when neither is defined, `WND_USE_ANSI_API` is defined automatically.
+ *
+ * @def WND_USE_UNICODE_API
+ * @brief User-facing opt-in counterpart of `WND_USE_ANSI_API`. Define this
+ *        to force the Unicode (`*W`) Win32 variants regardless of the
+ *        ambient `UNICODE` macro state. See `WND_USE_ANSI_API` for the full
+ *        selection rules. The macro is consumed only at header-parse time;
+ *        downstream code in this file checks `WND_USE_ANSI_API` exclusively.
  */
-#define WND_USE_ANSI_WINDPROC
+#if defined(WND_USE_ANSI_API) && defined(WND_USE_UNICODE_API)
+#error "WND_USE_ANSI_API and WND_USE_UNICODE_API are mutually exclusive"
+#elif !defined(WND_USE_ANSI_API) && !defined(WND_USE_UNICODE_API)
+#if !(defined(UNICODE) || defined(_UNICODE))
+#define WND_USE_ANSI_API
+#endif
 #endif
 
 /**
@@ -210,7 +232,7 @@ private:
             // WndProc, the prop is gone (RemoveProp in NCDESTROY) and we
             // must not dereference pThis again.
             if (GetThisFromHandle(hWnd) != pThis) {
-#if defined(WND_USE_ANSI_WINDPROC)
+#if defined(WND_USE_ANSI_API)
                 return ::DefWindowProcA(hWnd, uMsg, wParam, lParam);
 #else
                 return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
@@ -233,7 +255,7 @@ private:
 
         // Unbound window (e.g. a stray message on a torn-down handle):
         // fall back to the system default.
-#if defined(WND_USE_ANSI_WINDPROC)
+#if defined(WND_USE_ANSI_API)
         return ::DefWindowProcA(hWnd, uMsg, wParam, lParam);
 #else
         return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
@@ -252,7 +274,7 @@ protected:
     {
     }
 
-#if defined(WND_USE_ANSI_WINDPROC)
+#if defined(WND_USE_ANSI_API)
     /**
      * @brief Creates a new window of class @p lpClassName, transparently
      *        subclassing it so that messages route through this instance.
@@ -631,7 +653,7 @@ public:
                 ::OutputDebugString(TEXT("[Wnd] WARNING: destructor invoked on non-creator thread\n"));
             }
 #endif
-#if defined(WND_USE_ANSI_WINDPROC)
+#if defined(WND_USE_ANSI_API)
             ::SetWindowLongPtrA(_hWnd, GWLP_WNDPROC,
                 reinterpret_cast<LONG_PTR>(_defWndProc ? _defWndProc : ::DefWindowProcA));
 #else
@@ -811,7 +833,7 @@ protected:
     {
     }
 
-#if defined(WND_USE_ANSI_WINDPROC)
+#if defined(WND_USE_ANSI_API)
     /**
      * @brief Creates a **modeless** dialog from the given template.
      *
