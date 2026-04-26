@@ -579,10 +579,25 @@ protected:
             std::is_base_of<Wnd<TDerived>, TDerived>::value,
             "TDerived must derive from Wnd<TDerived> (CRTP)");
 
+        // Catch the "forgot to override" case: when TDerived inherits the
+        // base WndProc unchanged, the type of `&TDerived::WndProc` reduces
+        // to that of `&Wnd<TDerived>::WndProc`, and dispatching back into
+        // it would infinite-recurse.
+        static_assert(
+            !std::is_same<
+                decltype(&Wnd<TDerived>::WndProc),
+                decltype(&TDerived::WndProc)>::value,
+            "TDerived must override WndProc (otherwise dispatch would infinitely recurse)");
+
+        // Catch wrong-signature overrides (e.g. `void WndProc(int)`):
+        // `&TDerived::WndProc` resolves to whatever the user defined; if its
+        // type is not exactly `bool (TDerived::*)(Msg&, LRESULT&)` the
+        // comparison fails with a readable message before the call below
+        // would error out with a cryptic overload-resolution diagnostic.
         static_assert(
             std::is_same<
                 bool (TDerived::*)(Msg&, LRESULT&),
-                decltype(static_cast<bool (TDerived::*)(Msg&, LRESULT&)>(&TDerived::WndProc))>::value,
+                decltype(&TDerived::WndProc)>::value,
             "TDerived must implement WndProc method with signature: bool WndProc(Msg& msg, LRESULT& result)");
 
         return static_cast<TDerived *>(this)->WndProc(msg, result);
