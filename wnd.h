@@ -25,7 +25,6 @@ class Wnd
     HWND    _hWnd;
     WNDPROC _defWndProc;
     bool    _destroyed;
-    bool    _reserved[sizeof(void*) / sizeof(bool) - 1];
 
 private:
     static constexpr WCHAR
@@ -96,7 +95,7 @@ private:
 
 protected:
     Wnd() noexcept
-        : _hWnd(NULL), _defWndProc(NULL), _destroyed(false), _reserved{}
+        : _hWnd(NULL), _defWndProc(NULL), _destroyed(false)
     {
     }
 
@@ -303,7 +302,7 @@ public:
     Wnd& operator=(const Wnd&) = delete;
 
     Wnd(Wnd&& other) noexcept
-        : _hWnd(other._hWnd), _defWndProc(other._defWndProc), _destroyed(other._destroyed), _reserved{}
+        : _hWnd(other._hWnd), _defWndProc(other._defWndProc), _destroyed(other._destroyed)
     {
         if (_hWnd != NULL && !_destroyed) {
             BindThisToHandle(_hWnd, this);
@@ -367,7 +366,6 @@ class Dlg : public Wnd<TDerived>
     using TBase = Wnd<TDerived>;
 
     bool _isModal;
-    bool _reserved[sizeof(void*) / sizeof(bool) - 1];
 
 private:
     static INT_PTR CALLBACK StaticDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -407,7 +405,7 @@ private:
 
 protected:
     Dlg() noexcept
-        : TBase(), _isModal(false), _reserved{}
+        : TBase(), _isModal(false)
     {
     }
 
@@ -523,7 +521,7 @@ protected:
 
 public:
     Dlg(Dlg&& other) noexcept
-        : TBase(std::move(other)), _isModal(other._isModal), _reserved{}
+        : TBase(std::move(other)), _isModal(other._isModal)
     {
         other._isModal = false;
     }
