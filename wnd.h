@@ -341,22 +341,22 @@ public:
         return _destroyed;
     }
 
-    LRESULT SendMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0)
+    LRESULT SendMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) const
     {
         return ::SendMessageA(_hWnd, uMsg, wParam, lParam);
     }
 
-    LRESULT SendMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0)
+    LRESULT SendMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) const
     {
         return ::SendMessageW(_hWnd, uMsg, wParam, lParam);
     }
 
-    BOOL PostMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
+    BOOL PostMessageA(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) const noexcept
     {
         return ::PostMessageA(_hWnd, uMsg, wParam, lParam);
     }
 
-    BOOL PostMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) noexcept
+    BOOL PostMessageW(UINT uMsg, WPARAM wParam = 0, LPARAM lParam = 0) const noexcept
     {
         return ::PostMessageW(_hWnd, uMsg, wParam, lParam);
     }
