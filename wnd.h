@@ -35,8 +35,13 @@
  *     exclusive.
  *  2. If exactly one of `WND_USE_ANSI_API` / `WND_USE_UNICODE_API` is
  *     defined by the user, that selection is honoured.
- *  3. Otherwise the header falls back to inspecting `UNICODE` / `_UNICODE`:
- *     when neither is defined, `WND_USE_ANSI_API` is defined automatically.
+ *  3. Otherwise the header inspects `UNICODE` / `_UNICODE` and defines
+ *     `WND_USE_UNICODE_API` when either is set, or `WND_USE_ANSI_API`
+ *     when neither is set.
+ *
+ * After the header has been parsed exactly one of the two macros is
+ * always defined, so external tooling (Doxygen, IDE indexers, downstream
+ * `#ifdef` checks) can rely on either.
  *
  * @def WND_USE_UNICODE_API
  * @brief User-facing opt-in counterpart of `WND_USE_ANSI_API`. Define this
@@ -48,7 +53,9 @@
 #if defined(WND_USE_ANSI_API) && defined(WND_USE_UNICODE_API)
 #error "WND_USE_ANSI_API and WND_USE_UNICODE_API are mutually exclusive"
 #elif !defined(WND_USE_ANSI_API) && !defined(WND_USE_UNICODE_API)
-#if !(defined(UNICODE) || defined(_UNICODE))
+#if defined(UNICODE) || defined(_UNICODE)
+#define WND_USE_UNICODE_API
+#else
 #define WND_USE_ANSI_API
 #endif
 #endif
