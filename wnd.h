@@ -54,13 +54,13 @@
  *        downstream code in this file checks `WND_USE_ANSI_API` exclusively.
  */
 #if defined(WND_USE_ANSI_API) && defined(WND_USE_UNICODE_API)
-#error "WND_USE_ANSI_API and WND_USE_UNICODE_API are mutually exclusive"
+    #error "WND_USE_ANSI_API and WND_USE_UNICODE_API are mutually exclusive"
 #elif !defined(WND_USE_ANSI_API) && !defined(WND_USE_UNICODE_API)
-#if defined(UNICODE) || defined(_UNICODE)
-#define WND_USE_UNICODE_API
-#else
-#define WND_USE_ANSI_API
-#endif
+    #if defined(UNICODE) || defined(_UNICODE)
+        #define WND_USE_UNICODE_API
+    #else
+        #define WND_USE_ANSI_API
+    #endif
 #endif
 
 /**
