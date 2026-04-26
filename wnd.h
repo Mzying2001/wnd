@@ -1022,11 +1022,21 @@ public:
     /**
      * @brief Move-constructs from @p other, transferring both base-class
      *        state and the modal-flag.
+     *
+     * If `TBase`'s move fails (see `Wnd(Wnd&&)` — `BindThisToHandle` may
+     * fail), @p other keeps its handle and the modal-flag is left untouched
+     * on the source so its destructor still picks the right teardown path.
      */
     Dlg(Dlg&& other) noexcept
-        : TBase(std::move(other)), _isModal(other._isModal)
+        : TBase(std::move(other)), _isModal(false)
     {
-        other._isModal = false;
+        // After a successful base move `other._hWnd == NULL`. On bind
+        // failure `other` retains its HWND, and clearing its `_isModal`
+        // would make ~Dlg call DestroyWindow on a modal window.
+        if (other._hWnd == NULL) {
+            _isModal = other._isModal;
+            other._isModal = false;
+        }
     }
 
     /**
