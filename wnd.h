@@ -321,15 +321,27 @@ public:
     Wnd& operator=(const Wnd&) = delete;
 
     Wnd(Wnd&& other) noexcept
-        : _hWnd(other._hWnd), _defWndProc(other._defWndProc), _destroyed(other._destroyed), _owned(other._owned)
+        : _hWnd(NULL), _defWndProc(nullptr), _destroyed(true), _owned(false)
     {
-        if (_hWnd != NULL && !_destroyed) {
-            BindThisToHandle(_hWnd, this);
+        if (other._hWnd != NULL && !other._destroyed) {
+            if (BindThisToHandle(other._hWnd, this)) {
+                _hWnd       = other._hWnd;
+                _defWndProc = other._defWndProc;
+                _destroyed  = false;
+                _owned      = other._owned;
+
+                other._hWnd       = NULL;
+                other._defWndProc = nullptr;
+                other._destroyed  = true;
+                other._owned      = false;
+            }
         }
-        other._hWnd = NULL;
-        other._defWndProc = nullptr;
-        other._destroyed = false;
-        other._owned = false;
+        else {
+            other._hWnd       = NULL;
+            other._defWndProc = nullptr;
+            other._destroyed  = true;
+            other._owned      = false;
+        }
     }
 
     ~Wnd() noexcept
