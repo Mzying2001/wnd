@@ -320,9 +320,13 @@ protected:
     bool WndProc(Msg& msg, LRESULT& result)
     {
         static_assert(
-            !std::is_same<
-                decltype(&Wnd<TDerived>::WndProc),
-                decltype(&TDerived::WndProc)>::value,
+            std::is_base_of<Wnd<TDerived>, TDerived>::value,
+            "TDerived must derive from Wnd<TDerived> (CRTP)");
+        
+            static_assert(
+            std::is_same<
+                bool (TDerived::*)(Msg&, LRESULT&),
+                decltype(static_cast<bool (TDerived::*)(Msg&, LRESULT&)>(&TDerived::WndProc))>::value,
             "TDerived must implement WndProc method with signature: bool WndProc(Msg& msg, LRESULT& result)");
 
         return static_cast<TDerived *>(this)->WndProc(msg, result);
