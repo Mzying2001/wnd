@@ -113,12 +113,12 @@ template <typename TDerived>
 class Wnd
 {
     /**
-     * @brief Grants `Dlg<*>` access to the private prop helpers and
-     *        `_CreateParam`. `Wnd` itself no longer marshals through
-     *        `_CreateParam` (the CBT-hook binding path needs nothing of the
-     *        sort), but `Dlg` still relies on the same struct to recover
-     *        `this` inside `WM_INITDIALOG` because the dialog manager does
-     *        not let us subclass before that point.
+     * @brief Grants `Dlg<*>` access to the private prop helpers (`_PROP_THIS`,
+     *        `BindThisToHandle`, `GetThisFromHandle`) and the protected state
+     *        fields (`_hWnd`, `_destroyed`) so that its own static `DLGPROC`
+     *        trampoline can perform the equivalent bind / dispatch / destroy
+     *        bookkeeping the dialog manager prevents us from doing via
+     *        `GWLP_WNDPROC` subclassing.
      */
     template <typename>
     friend class Dlg;
@@ -178,21 +178,6 @@ private:
         static thread_local Wnd* pThis = nullptr;
         return pThis;
     }
-
-    /**
-     * @brief Marshalling struct used only by `Dlg<T>` to smuggle the owning
-     *        `Dlg*` through `WM_INITDIALOG::lParam` (since the dialog manager
-     *        binds-then-fires before we get a chance to subclass).
-     *
-     * `Wnd::CreateHandle` no longer uses this struct: the CBT hook binds
-     *  `this` to the new `HWND` before `WM_NCCREATE` is dispatched, so the
-     *  user's original `lpParam` is forwarded to `CreateWindowEx` unwrapped.
-     */
-    struct _CreateParam
-    {
-        Wnd* pThis;    /**< Pointer to the `Wnd` instance owning the soon-to-be window. */
-        LPVOID lpParam;/**< User-supplied `lpParam` to restore into the create struct. */
-    };
 
 private:
     /**
@@ -863,6 +848,22 @@ class Dlg : public Wnd<TDerived>
 
     bool _isModal; /**< `true` when the dialog was created via `CreateModal()`. */
 
+    /**
+     * @brief Marshalling struct passed through the dialog manager's
+     *        `dwInitParam` so that `StaticDlgProc` can recover the owning
+     *        `Dlg*` on `WM_INITDIALOG` and restore the user's original
+     *        init param for the rest of the dialog's life.
+     *
+     * `Wnd<T>` uses a CBT hook to bind before `WM_NCCREATE` and therefore
+     * needs no marshalling at all; dialogs cannot be subclassed that early
+     * (the dialog manager owns `GWLP_WNDPROC`), so this struct survives here.
+     */
+    struct _CreateParam
+    {
+        Dlg* pThis;     /**< Pointer to the `Dlg` instance owning the soon-to-be dialog. */
+        LPVOID lpParam; /**< User-supplied init param to restore at `WM_INITDIALOG` dispatch. */
+    };
+
 private:
     /**
      * @brief Static `DLGPROC` trampoline used for both modal and modeless
@@ -887,7 +888,7 @@ private:
             uMsg == WM_INITDIALOG)
         {
             auto* pParam = reinterpret_cast<
-                typename TBase::_CreateParam*>(lParam);
+                _CreateParam*>(lParam);
 
             if (pParam != nullptr) {
                 pThis = pParam->pThis;
@@ -964,7 +965,7 @@ protected:
         // subclass chain.
         self._defWndProc = ::DefDlgProcA;
 
-        typename TBase::_CreateParam initParam{
+        _CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
         // The `self._hWnd` field is populated by StaticDlgProc on the
@@ -1005,7 +1006,7 @@ protected:
         _isModal = true;
         self._defWndProc = ::DefDlgProcA;
 
-        typename TBase::_CreateParam initParam{
+        _CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
         return ::DialogBoxParamA(
@@ -1037,7 +1038,7 @@ protected:
         // calls coming from the user's WndProc forward sensibly.
         self._defWndProc = ::DefDlgProcW;
 
-        typename TBase::_CreateParam initParam{
+        _CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
         // The `self._hWnd` field is populated by StaticDlgProc on the
@@ -1071,7 +1072,7 @@ protected:
         _isModal = true;
         self._defWndProc = ::DefDlgProcW;
 
-        typename TBase::_CreateParam initParam{
+        _CreateParam initParam{
             this, reinterpret_cast<LPVOID>(dwInitParam) };
 
         return ::DialogBoxParamW(
