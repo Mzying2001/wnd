@@ -22,9 +22,8 @@
 #define WND_H_INCLUDED
 
 #include <windows.h>
-#include <cstdint>
-#include <string>
 #include <type_traits>
+#include <utility>
 
 /**
  * @def WND_USE_ANSI_API
@@ -82,10 +81,14 @@ struct Msg
  *        a `WndProc` method on the derived type.
  *
  * Two acquisition modes are supported:
- *  - **Create mode**: `CreateHandle()` registers a derived window class
- *    `<original-class>_Wnd_Class` (subclassing the user-supplied class) and
- *    creates a new window. The instance owns the resulting `HWND` and will
- *    `DestroyWindow` it on destruction.
+ *  - **Create mode**: `CreateHandle()` installs a thread-scoped `WH_CBT` hook
+ *    and creates a window of the user-supplied class. The hook fires once on
+ *    `HCBT_CREATEWND` — before `WM_NCCREATE` — and binds the `Wnd*` to the
+ *    new `HWND` and swaps `GWLP_WNDPROC` over to the static trampoline. The
+ *    original class name is used as-is, so the system theme engine continues
+ *    to recognise `BUTTON`/`EDIT`/`SysListView32`/etc. and apply visual styles.
+ *    The instance owns the resulting `HWND` and will `DestroyWindow` it on
+ *    destruction.
  *  - **Attach mode**: `AttachHandle()` takes ownership of message dispatch on
  *    an externally-owned `HWND` by replacing its `GWLP_WNDPROC` with the
  *    static trampoline. The instance does **not** own the `HWND` and will
@@ -111,8 +114,11 @@ class Wnd
 {
     /**
      * @brief Grants `Dlg<*>` access to the private prop helpers and
-     *        `_CreateParam`, since `Dlg` reuses the same prop key and
-     *        marshalling structure for its own dialog dispatch.
+     *        `_CreateParam`. `Wnd` itself no longer marshals through
+     *        `_CreateParam` (the CBT-hook binding path needs nothing of the
+     *        sort), but `Dlg` still relies on the same struct to recover
+     *        `this` inside `WM_INITDIALOG` because the dialog manager does
+     *        not let us subclass before that point.
      */
     template <typename>
     friend class Dlg;
@@ -138,10 +144,49 @@ private:
     }
 
     /**
-     * @brief Marshalling struct passed through `CREATESTRUCT::lpCreateParams`
-     *        from `CreateHandle()` so that `StaticWndProc` can recover the
-     *        owning `Wnd*` during `WM_NCCREATE` while still forwarding the
-     *        user's original `lpParam`.
+     * @brief Thread-local slot holding the `WH_CBT` hook installed by
+     *        `CreateHandle()` for the duration of a single `CreateWindowEx`
+     *        call.
+     *
+     * Wrapped in a static function returning a reference (same trick as
+     * `_PROP_THIS()`) so the function-local `static thread_local` storage is
+     * provided by the compiler without an out-of-class definition — works
+     * cleanly under C++11, no `inline` variable required.
+     *
+     * Set just before `CreateWindowEx` and cleared inside `CbtHookProc` on
+     * the first `HCBT_CREATEWND` (self-unhook). The tail of `CreateHandle`
+     * also clears it as a fail-safe in case the hook never fired (e.g. the
+     * class lookup failed before any window was created).
+     */
+    static HHOOK& _CbtHook() noexcept
+    {
+        static thread_local HHOOK hHook = NULL;
+        return hHook;
+    }
+
+    /**
+     * @brief Thread-local slot holding the `Wnd*` waiting to be bound to the
+     *        next `HCBT_CREATEWND`.
+     *
+     * Counterpart of `_CbtHook()`; see that function's docs for the lifecycle.
+     * Cleared to `nullptr` after a successful bind so a delayed/spurious
+     * `HCBT_CREATEWND` (would not normally happen on a thread-scoped hook,
+     * but cheap insurance) cannot bind a stale pointer.
+     */
+    static Wnd*& _CbtThis() noexcept
+    {
+        static thread_local Wnd* pThis = nullptr;
+        return pThis;
+    }
+
+    /**
+     * @brief Marshalling struct used only by `Dlg<T>` to smuggle the owning
+     *        `Dlg*` through `WM_INITDIALOG::lParam` (since the dialog manager
+     *        binds-then-fires before we get a chance to subclass).
+     *
+     * `Wnd::CreateHandle` no longer uses this struct: the CBT hook binds
+     *  `this` to the new `HWND` before `WM_NCCREATE` is dispatched, so the
+     *  user's original `lpParam` is forwarded to `CreateWindowEx` unwrapped.
      */
     struct _CreateParam
     {
@@ -189,47 +234,96 @@ private:
     }
 
     /**
-     * @brief Static `WNDPROC` trampoline registered for every subclassed
-     *        window. Recovers the bound `Wnd*` and forwards the message to
-     *        its `WndProc`.
+     * @brief Thread-scoped `WH_CBT` filter installed by `CreateHandle()` to
+     *        bind the pending `Wnd*` to its freshly-allocated `HWND` *before*
+     *        the very first window-procedure message (`WM_NCCREATE`).
+     *
+     * The CBT route lets `CreateHandle` use the **original** class name
+     * unmodified when calling `CreateWindowEx`, which is what the system
+     * theme engine matches against to apply visual styles to `BUTTON`,
+     * `EDIT`, `SysListView32` and friends. The previous class-re-registration
+     * trick broke those matches.
+     *
+     * Steps on `HCBT_CREATEWND`:
+     *  1. Pull the new `HWND` from `wParam` and `pThis` from `_CbtThis()`.
+     *  2. Self-unhook first. The hook is thread-scoped and we only want it to
+     *     fire for *our* `CreateWindowEx`; clearing it up-front also prevents
+     *     re-entry should the user create child windows from inside
+     *     `WM_NCCREATE` / `WM_CREATE`.
+     *  3. Save the class's original `WNDPROC` for `DefWndProc()` forwarding.
+     *  4. `SetProp(_PROP_THIS, pThis)` so `StaticWndProc` finds the binding.
+     *  5. Install `StaticWndProc` via `SetWindowLongPtr(GWLP_WNDPROC, ...)`.
+     *
+     * If the `SetProp` in step 4 fails (per-process prop quota exhausted,
+     * extremely rare) we abort window creation by returning a non-zero value
+     * from the hook — `CreateWindowEx` then returns `NULL` and `CreateHandle`
+     * cleanly reports failure to the caller.
+     */
+    static LRESULT CALLBACK CbtHookProc(int nCode, WPARAM wParam, LPARAM lParam)
+    {
+        if (nCode == HCBT_CREATEWND && _CbtThis() != nullptr)
+        {
+            HWND hWnd  = reinterpret_cast<HWND>(wParam);
+            Wnd* pThis = _CbtThis();
+
+            // Self-unhook before doing anything that could re-enter window
+            // creation (SetWindowLongPtr cannot, but defensive ordering keeps
+            // the invariant "hook is installed only across one CreateWindowEx
+            // call" trivially true).
+            ::UnhookWindowsHookEx(_CbtHook());
+            _CbtHook() = NULL;
+            _CbtThis() = nullptr;
+
+#if defined(WND_USE_ANSI_API)
+            WNDPROC originalProc = reinterpret_cast<WNDPROC>(
+                ::GetWindowLongPtrA(hWnd, GWLP_WNDPROC));
+#else
+            WNDPROC originalProc = reinterpret_cast<WNDPROC>(
+                ::GetWindowLongPtrW(hWnd, GWLP_WNDPROC));
+#endif
+
+            pThis->_hWnd       = hWnd;
+            pThis->_defWndProc = originalProc;
+
+            if (!BindThisToHandle(hWnd, pThis)) {
+                // SetProp failed — roll back and tell the system to abort
+                // window creation by returning non-zero from HCBT_CREATEWND.
+                pThis->_hWnd       = NULL;
+                pThis->_defWndProc = nullptr;
+                return 1;
+            }
+
+#if defined(WND_USE_ANSI_API)
+            ::SetWindowLongPtrA(hWnd, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(StaticWndProc));
+#else
+            ::SetWindowLongPtrW(hWnd, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(StaticWndProc));
+#endif
+        }
+        return ::CallNextHookEx(NULL, nCode, wParam, lParam);
+    }
+
+    /**
+     * @brief Static `WNDPROC` trampoline installed by `CbtHookProc` (create
+     *        mode) or `AttachHandle` (attach mode). Recovers the bound
+     *        `Wnd*` via `_PROP_THIS` and forwards the message to its
+     *        `WndProc`.
      *
      * Special handling:
-     *  - On `WM_NCCREATE` for a freshly-created window, unwraps the
-     *    `_CreateParam*` smuggled through `lpCreateParams`, binds the `Wnd*`
-     *    to the HWND, and restores the user's original `lpParam` for the
-     *    rest of the create-time messages.
      *  - On `WM_NCDESTROY`, marks the wrapper `_destroyed` and removes the
      *    prop so any later prop-lookup correctly returns `nullptr`.
      *  - After every callback into user code, re-reads the prop to detect
      *    self-deletion (`delete this` inside `WndProc`) and falls through
      *    to `DefWindowProc` instead of touching the freed instance.
+     *
+     * No `WM_NCCREATE` special case: binding is performed earlier (CBT hook
+     * or `AttachHandle`), so by the time this trampoline ever runs the
+     * `_PROP_THIS` slot is already populated.
      */
     static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         Wnd* pThis = GetThisFromHandle(hWnd);
-
-        // First-time binding path: only at NCCREATE, only when we haven't
-        // already been bound (e.g. via AttachHandle's SetWindowLongPtr).
-        if (uMsg == WM_NCCREATE && pThis == nullptr && lParam != 0)
-        {
-            auto* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
-            auto* pParam = reinterpret_cast<_CreateParam*>(pCreate->lpCreateParams);
-
-            if (pParam != nullptr)
-            {
-                pThis = pParam->pThis;
-                pThis->_hWnd = hWnd;
-                if (!BindThisToHandle(hWnd, pThis)) {
-                    // SetProp failed — abort window creation by returning
-                    // FALSE from NCCREATE, after restoring the original
-                    // lpParam so any debugger inspection sees consistent state.
-                    pThis->_hWnd = NULL;
-                    pCreate->lpCreateParams = pParam->lpParam;
-                    return FALSE;
-                }
-                pCreate->lpCreateParams = pParam->lpParam;
-            }
-        }
 
         if (pThis != nullptr)
         {
@@ -286,15 +380,18 @@ protected:
 
 #if defined(WND_USE_ANSI_API)
     /**
-     * @brief Creates a new window of class @p lpClassName, transparently
-     *        subclassing it so that messages route through this instance.
+     * @brief Creates a new window of class @p lpClassName and subclasses it
+     *        so that messages route through this instance.
      *
-     * Internally registers a derived class named `<lpClassName>_Wnd_Class`
-     * the first time the function runs for a given base class; subsequent
-     * calls reuse the existing registration.
+     * Internally installs a thread-scoped `WH_CBT` filter and calls
+     * `CreateWindowExA` with @p lpClassName **unmodified** — the original
+     * class identity is preserved so the system theme engine continues to
+     * apply visual styles. The CBT filter fires once on `HCBT_CREATEWND`,
+     * binds this instance to the new `HWND`, swaps in `StaticWndProc`, and
+     * self-unhooks before `WM_NCCREATE` reaches the window procedure.
      *
      * @param dwExStyle    Extended window style passed to `CreateWindowExA`.
-     * @param lpClassName  Name of the base class to subclass; must be non-null.
+     * @param lpClassName  Name of the class to instantiate; must be non-null.
      * @param lpWindowName Initial window text.
      * @param dwStyle      Window style.
      * @param X, Y         Initial position.
@@ -302,13 +399,14 @@ protected:
      * @param hWndParent   Parent / owner window.
      * @param hMenu        Menu handle, or child-window id when @p dwStyle has
      *                     `WS_CHILD`.
-     * @param hInstance    Module instance owning the new class registration.
-     * @param lpParam      Forwarded as `CREATESTRUCT::lpCreateParams` to the
-     *                     user's `WM_NCCREATE` / `WM_CREATE` handlers.
+     * @param hInstance    Module instance forwarded to `CreateWindowExA`.
+     * @param lpParam      Forwarded **verbatim** as `CREATESTRUCT::lpCreateParams`
+     *                     to the user's `WM_NCCREATE` / `WM_CREATE` handlers
+     *                     (no longer wrapped in any marshalling struct).
      * @return `true` on success; `false` if the instance was already bound,
-     *         `lpClassName` was null, the base class did not exist, class
-     *         registration failed, or `CreateWindowExA` returned NULL.
-     *         On failure, all internal state is rolled back.
+     *         `lpClassName` was null, the CBT hook could not be installed, or
+     *         `CreateWindowExA` returned NULL. On failure all internal state
+     *         is rolled back.
      */
     bool CreateHandle(
         DWORD dwExStyle,
@@ -328,47 +426,19 @@ protected:
             return false;
         }
 
-        WNDCLASSEXA wc = { 0 };
-        wc.cbSize = sizeof(wc);
-
-        // Look up the base class so we can preserve its WNDPROC for
-        // forwarding through DefWndProc().
-        if (!::GetClassInfoExA(hInstance, lpClassName, &wc)) {
+        // Arm the thread-local slot then install the CBT hook. Order matters:
+        // _CbtThis must be visible by the time HCBT_CREATEWND fires.
+        _CbtThis() = this;
+        _CbtHook() = ::SetWindowsHookExA(WH_CBT, CbtHookProc, NULL, ::GetCurrentThreadId());
+        
+        if (_CbtHook() == NULL) {
+            _CbtThis() = nullptr;
             return false;
         }
 
-        _defWndProc = wc.lpfnWndProc;
-
-        // The address of StaticWndProc is unique per Wnd<T> instantiation, so
-        // appending it makes the registered class name unique per T. Without
-        // it, two Wnd<A>/Wnd<B> subclassing the same base would share one
-        // registration and dispatch through the wrong StaticWndProc.
-        std::string className = lpClassName;
-        className += "_Wnd_Class_";
-        className += std::to_string(reinterpret_cast<std::uintptr_t>(&StaticWndProc));
-
-        // Register the derived class once per process. If it already exists,
-        // GetClassInfoEx populates `wc` and we skip re-reg.
-        if (!::GetClassInfoExA(hInstance, className.c_str(), &wc))
-        {
-            wc.lpfnWndProc = StaticWndProc;
-            wc.lpszClassName = className.c_str();
-            // GetClassInfoEx does NOT fill in hInstance; set it explicitly so
-            // the new class is owned by the caller's module rather than NULL.
-            wc.hInstance = hInstance;
-
-            if (!::RegisterClassExA(&wc)) {
-                _defWndProc = nullptr;
-                return false;
-            }
-        }
-
-        // _CreateParam is consumed by StaticWndProc on WM_NCCREATE.
-        _CreateParam createParam = { this, lpParam };
-
-        _hWnd = ::CreateWindowExA(
+        HWND hWnd = ::CreateWindowExA(
             dwExStyle,
-            className.c_str(),
+            lpClassName,
             lpWindowName,
             dwStyle,
             X,
@@ -378,14 +448,32 @@ protected:
             hWndParent,
             hMenu,
             hInstance,
-            &createParam);
+            lpParam);
 
-        if (_hWnd != NULL) {
+        // Fail-safe unhook: if CreateWindowEx never produced a window (bad
+        // class name, etc.) HCBT_CREATEWND did not fire and the hook is
+        // still armed. Clear it here.
+        if (_CbtHook() != NULL) {
+            ::UnhookWindowsHookEx(_CbtHook());
+            _CbtHook() = NULL;
+            _CbtThis() = nullptr;
+        }
+
+        if (hWnd != NULL) {
+            // Hook already populated _hWnd / _defWndProc and installed
+            // StaticWndProc. Just mark ownership.
             _owned = true;
             return true;
         }
-        _defWndProc = nullptr;
-        return false;
+        else {
+            // Failure after partial bind (e.g. user's WM_NCCREATE returned FALSE):
+            // StaticWndProc handled WM_NCDESTROY and set _destroyed/cleared the
+            // prop. Reset the local fields so the Wnd object is back to its
+            // pre-CreateHandle state and the caller can retry.
+            _hWnd = NULL;
+            _defWndProc = nullptr;
+            return false;
+        }
     }
 
     /**
@@ -466,47 +554,17 @@ protected:
             return false;
         }
 
-        WNDCLASSEXW wc = { 0 };
-        wc.cbSize = sizeof(wc);
+        _CbtThis() = this;
+        _CbtHook() = ::SetWindowsHookExW(WH_CBT, CbtHookProc, NULL, ::GetCurrentThreadId());
 
-        // Look up the base class so we can preserve its WNDPROC for
-        // forwarding through DefWndProc().
-        if (!::GetClassInfoExW(hInstance, lpClassName, &wc)) {
+        if (_CbtHook() == NULL) {
+            _CbtThis() = nullptr;
             return false;
         }
 
-        _defWndProc = wc.lpfnWndProc;
-
-        // The address of StaticWndProc is unique per Wnd<T> instantiation, so
-        // appending it makes the registered class name unique per T. Without
-        // it, two Wnd<A>/Wnd<B> subclassing the same base would share one
-        // registration and dispatch through the wrong StaticWndProc.
-        std::wstring className = lpClassName;
-        className += L"_Wnd_Class_";
-        className += std::to_wstring(reinterpret_cast<std::uintptr_t>(&StaticWndProc));
-
-        // Register the derived class once per process. If it already exists,
-        // GetClassInfoEx populates `wc` and we skip re-reg.
-        if (!::GetClassInfoExW(hInstance, className.c_str(), &wc))
-        {
-            wc.lpfnWndProc = StaticWndProc;
-            wc.lpszClassName = className.c_str();
-            // GetClassInfoEx does NOT fill in hInstance; set it explicitly so
-            // the new class is owned by the caller's module rather than NULL.
-            wc.hInstance = hInstance;
-
-            if (!::RegisterClassExW(&wc)) {
-                _defWndProc = nullptr;
-                return false;
-            }
-        }
-
-        // _CreateParam is consumed by StaticWndProc on WM_NCCREATE.
-        _CreateParam createParam = { this, lpParam };
-
-        _hWnd = ::CreateWindowExW(
+        HWND hWnd = ::CreateWindowExW(
             dwExStyle,
-            className.c_str(),
+            lpClassName,
             lpWindowName,
             dwStyle,
             X,
@@ -516,14 +574,23 @@ protected:
             hWndParent,
             hMenu,
             hInstance,
-            &createParam);
+            lpParam);
 
-        if (_hWnd != NULL) {
+        if (_CbtHook() != NULL) {
+            ::UnhookWindowsHookEx(_CbtHook());
+            _CbtHook() = NULL;
+            _CbtThis() = nullptr;
+        }
+
+        if (hWnd != NULL) {
             _owned = true;
             return true;
         }
-        _defWndProc = nullptr;
-        return false;
+        else {
+            _hWnd = NULL;
+            _defWndProc = nullptr;
+            return false;
+        }
     }
 
     /**
