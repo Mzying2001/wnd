@@ -23,21 +23,21 @@ A single-header, header-only C++ library that wraps Win32 windows and dialog box
 
 `wnd.h` is a single header with no external dependencies beyond `<windows.h>` and `<type_traits>` / `<utility>` from the standard library. Copy it anywhere on your include path.
 
-```
+```text
 your_project/
 └── include/
-    └── wnd.h   ← drop it here
+    └── wnd.h
 ```
 
 ## Character-set selection
 
-| Scenario | Result |
-|---|---|
-| `WND_USE_ANSI_API` defined | ANSI (`*A`) Win32 variants |
-| `WND_USE_UNICODE_API` defined | Unicode (`*W`) Win32 variants |
-| Both defined | Compile error |
-| Neither defined, `UNICODE` or `_UNICODE` set | Unicode (`*W`) |
-| Neither defined, no ambient macro | ANSI (`*A`) |
+| Scenario                                     | Result                        |
+| -------------------------------------------- | ----------------------------- |
+| `WND_USE_ANSI_API` defined                   | ANSI (`*A`) Win32 variants    |
+| `WND_USE_UNICODE_API` defined                | Unicode (`*W`) Win32 variants |
+| Both defined                                 | Compile error                 |
+| Neither defined, `UNICODE` or `_UNICODE` set | Unicode (`*W`)                |
+| Neither defined, no ambient macro            | ANSI (`*A`)                   |
 
 Define the macro before the `#include` or via a compiler flag:
 
@@ -50,39 +50,74 @@ Define the macro before the `#include` or via a compiler flag:
 
 ### Wrapping a new window
 
+`CreateHandle` and `AttachHandle` are intentionally `protected`.
+Derived classes are expected to expose higher-level wrappers that reflect the semantics of the wrapped control or window type.
+
 ```cpp
 #include "wnd.h"
 
 class MyEdit : public Wnd<MyEdit>
 {
 public:
+    bool Create(HWND hParentWnd, HINSTANCE hInstance, int id)
+    {
+        return CreateHandle(
+            0,
+            TEXT("EDIT"),
+            TEXT(""),
+            WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
+            10, 10, 300, 24,
+            hParentWnd,
+            reinterpret_cast<HMENU>(id),
+            hInstance,
+            nullptr);
+    }
+
     bool WndProc(Msg& msg, LRESULT& result)
     {
         if (msg.uMsg == WM_CHAR)
         {
-            // handle keystroke …
+            // Handle keystroke…
             result = 0;
-            return true;   // message handled
+            return true;
         }
-        return false;      // defer to original WNDPROC
+
+        return false; // Defer to original WNDPROC
     }
 };
 
 // Somewhere in your initialisation code:
 MyEdit edit;
-edit.CreateHandle(
-    0, TEXT("EDIT"), TEXT(""),
-    WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL,
-    10, 10, 300, 24,
-    hParentWnd, reinterpret_cast<HMENU>(IDC_EDIT1),
-    hInstance, nullptr);
+
+edit.Create(
+    hParentWnd,
+    hInstance,
+    IDC_EDIT1);
 ```
 
 ### Attaching to an existing HWND
 
+Likewise, attaching is normally exposed through a derived helper:
+
 ```cpp
+class MyEdit : public Wnd<MyEdit>
+{
+public:
+    bool Attach(HWND hWnd)
+    {
+        return AttachHandle(hWnd);
+    }
+
+    bool WndProc(Msg& msg, LRESULT& result)
+    {
+        return false;
+    }
+};
+
 MyEdit edit;
-edit.AttachHandle(hSomeExternalEdit);
+
+edit.Attach(hSomeExternalEdit);
+
 // edit.~MyEdit() restores the original WndProc automatically.
 ```
 
@@ -92,28 +127,67 @@ edit.AttachHandle(hSomeExternalEdit);
 class MyDlg : public Dlg<MyDlg>
 {
 public:
+    bool ShowModal(
+        HINSTANCE hInstance,
+        HWND hOwnerWnd)
+    {
+        return CreateModal(
+            hInstance,
+            MAKEINTRESOURCE(IDD_MYDIALOG),
+            hOwnerWnd) >= 0;
+    }
+
     bool WndProc(Msg& msg, LRESULT& result)
     {
-        if (msg.uMsg == WM_COMMAND && LOWORD(msg.wParam) == IDOK)
+        if (msg.uMsg == WM_COMMAND &&
+            LOWORD(msg.wParam) == IDOK)
         {
             DestroyDlg(IDOK);
+            result = IDOK;
             return true;
         }
+
         return false;
     }
 };
 
 MyDlg dlg;
-INT_PTR ret = dlg.CreateModal(hInstance, MAKEINTRESOURCE(IDD_MYDIALOG), hOwnerWnd);
-// CreateModal blocks until DestroyDlg / EndDialog is called.
+
+dlg.ShowModal(
+    hInstance,
+    hOwnerWnd);
 ```
 
 ### Modeless dialog
 
 ```cpp
+class MyDlg : public Dlg<MyDlg>
+{
+public:
+    bool Create(
+        HINSTANCE hInstance,
+        HWND hOwnerWnd)
+    {
+        return CreateDlg(
+            hInstance,
+            MAKEINTRESOURCE(IDD_MYDIALOG),
+            hOwnerWnd);
+    }
+
+    bool WndProc(Msg& msg, LRESULT& result)
+    {
+        return false;
+    }
+};
+
 MyDlg dlg;
-dlg.CreateDlg(hInstance, MAKEINTRESOURCE(IDD_MYDIALOG), hOwnerWnd);
+
+dlg.Create(
+    hInstance,
+    hOwnerWnd);
+
 ShowWindow(dlg.Handle(), SW_SHOW);
+
 // dlg.~Dlg() calls DestroyWindow automatically.
 ```
 
@@ -123,66 +197,128 @@ ShowWindow(dlg.Handle(), SW_SHOW);
 
 Plain aggregate passed by reference to every `WndProc` call.
 
-| Field | Type | Description |
-|---|---|---|
-| `uMsg` | `UINT` | Win32 message identifier |
-| `wParam` | `WPARAM` | Message-specific WPARAM |
-| `lParam` | `LPARAM` | Message-specific LPARAM |
+| Field    | Type     | Description              |
+| -------- | -------- | ------------------------ |
+| `uMsg`   | `UINT`   | Win32 message identifier |
+| `wParam` | `WPARAM` | Message-specific WPARAM  |
+| `lParam` | `LPARAM` | Message-specific LPARAM  |
 
-### `Wnd<TDerived>`
+---
 
-| Member | Description |
-|---|---|
-| `CreateHandle(…)` | Creates a new `HWND` and subclasses it. Returns `bool`. |
+## `Wnd<TDerived>`
+
+The low-level window-management APIs are intentionally `protected`.
+Derived classes are expected to expose domain-specific wrappers around them.
+
+### Protected members
+
+| Member               | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `CreateHandle(…)`    | Creates a new `HWND` and subclasses it. Returns `bool`.  |
 | `AttachHandle(HWND)` | Subclasses an externally-created window. Returns `bool`. |
-| `DefWndProc(Msg&)` | Forwards to the original (pre-subclass) `WNDPROC`. |
-| `Handle()` | Returns the wrapped `HWND`, or `NULL` when unbound. |
-| `IsDestroyed()` | Returns `true` after `WM_NCDESTROY` has been observed. |
-| `SendMessageA/W(…)` | Synchronous send. |
-| `PostMessageA/W(…)` | Asynchronous post. |
-| destructor | Restores original `WNDPROC`; calls `DestroyWindow` if owned. |
+| `DefWndProc(Msg&)`   | Forwards to the original (pre-subclass) `WNDPROC`.       |
+
+### Public members
+
+| Member              | Description                                                  |
+| ------------------- | ------------------------------------------------------------ |
+| `Handle()`          | Returns the wrapped `HWND`, or `NULL` when unbound.          |
+| `IsDestroyed()`     | Returns `true` after `WM_NCDESTROY` has been observed.       |
+| `SendMessageA/W(…)` | Synchronous send.                                            |
+| `PostMessageA/W(…)` | Asynchronous post.                                           |
+| destructor          | Restores original `WNDPROC`; calls `DestroyWindow` if owned. |
 
 `Wnd` is non-copyable. Move construction transfers the `HWND` binding.
 
-### `Dlg<TDerived>` — extends `Wnd<TDerived>`
+---
 
-| Member | Description |
-|---|---|
-| `CreateDlg(…)` | Creates a modeless dialog. Returns `bool`. |
-| `CreateModal(…)` | Creates and runs a modal dialog. Blocks; returns `INT_PTR`. |
-| `DestroyDlg(INT_PTR)` | Calls `EndDialog` (modal) or `DestroyWindow` (modeless). |
-| `IsModal()` | Returns `true` when created via `CreateModal`. |
-| destructor | Calls `EndDialog(0)` or `DestroyWindow` as appropriate. |
+## `Dlg<TDerived>` — extends `Wnd<TDerived>`
 
-### Implementing `WndProc`
+Dialog creation APIs are also intentionally `protected`.
+
+### Protected members
+
+| Member                | Description                                                 |
+| --------------------- | ----------------------------------------------------------- |
+| `CreateDlg(…)`        | Creates a modeless dialog. Returns `bool`.                  |
+| `CreateModal(…)`      | Creates and runs a modal dialog. Blocks; returns `INT_PTR`. |
+| `DestroyDlg(INT_PTR)` | Calls `EndDialog` (modal) or `DestroyWindow` (modeless).    |
+
+### Public members
+
+| Member      | Description                                             |
+| ----------- | ------------------------------------------------------- |
+| `IsModal()` | Returns `true` when created via `CreateModal`.          |
+| destructor  | Calls `EndDialog(0)` or `DestroyWindow` as appropriate. |
+
+---
+
+## Implementing `WndProc`
 
 ```cpp
 bool WndProc(Msg& msg, LRESULT& result)
 {
-    // Return true  → message is fully handled; result is the LRESULT.
-    // Return false → defer to DefWndProc (original procedure or DefWindowProc).
+    // Return true:
+    //   The message is fully handled.
+    //   'result' becomes the returned LRESULT.
+
+    // Return false:
+    //   Dispatch falls through to DefWndProc().
 }
 ```
 
-For dialogs the mapping follows DLGPROC convention: returning `true` sets `DWLP_MSGRESULT` to `result` and returns `TRUE` to the dialog manager; returning `false` returns `FALSE`.
+For dialogs the mapping follows DLGPROC convention:
+
+* Returning `true` sets `DWLP_MSGRESULT` to `result` and returns `TRUE`
+* Returning `false` returns `FALSE` so the dialog manager performs default processing
 
 ## Design notes
 
 ### CBT hook — binding before the first message
 
-`Wnd::CreateHandle` installs a thread-local `WH_CBT` hook that fires on `HCBT_CREATEWND`, which precedes `WM_NCCREATE`. This lets the binding be in place before the very first message the window procedure receives, without registering a custom window class. The hook self-unregisters immediately after the first `HCBT_CREATEWND` so nested `CreateWindow` calls inside `WM_NCCREATE` or `WM_CREATE` are not affected.
+`Wnd::CreateHandle` installs a thread-local `WH_CBT` hook that fires on `HCBT_CREATEWND`, which precedes `WM_NCCREATE`.
+
+This lets the binding be established before the first window-procedure message is dispatched, without registering a custom window class.
+
+The hook self-unregisters immediately after the first `HCBT_CREATEWND`, so nested `CreateWindow` calls inside `WM_NCCREATE` or `WM_CREATE` are unaffected.
 
 ### Window property table — per-HWND instance storage
 
-The `Wnd*` back-pointer is stored as a window property (`SetProp`/`GetProp`) keyed by a global atom. This avoids a global `map<HWND, Wnd*>` and the locking it would require; atom-based lookup is a single integer comparison.
+The `Wnd*` back-pointer is stored as a window property (`SetProp` / `GetProp`) keyed by a global atom.
+
+This avoids:
+
+* a global `map<HWND, Wnd*>`
+* explicit locking
+* global lifetime coordination
+
+Atom-based lookup is effectively a single integer comparison.
 
 ### Dialog binding — `WM_INITDIALOG` smuggling
 
-The dialog manager controls `GWLP_WNDPROC`, so the CBT strategy is unavailable. Instead, `CreateDlg` / `CreateModal` wrap the caller-supplied `dwInitParam` in a small `_CreateParam` struct and pass a pointer to it as the actual `dwInitParam`. `StaticDlgProc` unwraps the struct on the first `WM_INITDIALOG`, plants the property, and restores the original value of `lParam` before dispatching to user code — so `WndProc` sees exactly what the caller passed.
+The dialog manager owns `GWLP_WNDPROC`, so the CBT strategy cannot be used for dialogs.
+
+Instead, `CreateDlg` / `CreateModal` wrap the caller-supplied `dwInitParam` in a small `_CreateParam` structure and pass a pointer to it as the actual dialog init parameter.
+
+`StaticDlgProc` unwraps the structure during the first `WM_INITDIALOG`, binds the `Dlg*`, then restores the caller's original `lParam` before dispatching to user code.
+
+As a result, the user's `WndProc` sees exactly the same `lParam` value they originally supplied.
 
 ## Thread safety
 
-Win32 windows are thread-affine. A `Wnd` or `Dlg` instance must be constructed, used, and destructed on the thread that owns its `HWND`. Cross-thread destruction is flagged with `OutputDebugString` in debug builds; release builds skip the cleanup to avoid undefined behaviour from `SetWindowLongPtr` on the wrong thread.
+Win32 windows are thread-affine.
+
+A `Wnd` or `Dlg` instance must be:
+
+* created
+* used
+* destroyed
+
+on the thread that owns the underlying `HWND`.
+
+Cross-thread destruction is flagged with `OutputDebugString` in debug builds.
+
+Release builds intentionally skip teardown work rather than invoking undefined behaviour through `SetWindowLongPtr` or `DestroyWindow` on the wrong thread.
 
 ## License
 
