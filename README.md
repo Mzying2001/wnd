@@ -238,18 +238,18 @@ Dialog creation APIs are also intentionally `protected`.
 
 ### Protected members
 
-| Member                | Description                                                 |
-| --------------------- | ----------------------------------------------------------- |
-| `CreateDlg(…)`        | Creates a modeless dialog. Returns `bool`.                  |
-| `CreateModal(…)`      | Creates and runs a modal dialog. Blocks; returns `INT_PTR`. |
-| `DestroyDlg(INT_PTR)` | Calls `EndDialog` (modal) or `DestroyWindow` (modeless).    |
+| Member           | Description                                                 |
+| ---------------- | ----------------------------------------------------------- |
+| `CreateDlg(…)`   | Creates a modeless dialog. Returns `bool`.                  |
+| `CreateModal(…)` | Creates and runs a modal dialog. Blocks; returns `INT_PTR`. |
 
 ### Public members
 
-| Member      | Description                                             |
-| ----------- | ------------------------------------------------------- |
-| `IsModal()` | Returns `true` when created via `CreateModal`.          |
-| destructor  | Calls `EndDialog(0)` or `DestroyWindow` as appropriate. |
+| Member                | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `IsModal()`           | Returns `true` when created via `CreateModal`.           |
+| `DestroyDlg(INT_PTR)` | Calls `EndDialog` (modal) or `DestroyWindow` (modeless). |
+| destructor            | Calls `EndDialog(0)` or `DestroyWindow` as appropriate.  |
 
 ---
 
@@ -269,8 +269,8 @@ bool WndProc(Msg& msg, LRESULT& result)
 
 For dialogs the mapping follows DLGPROC convention:
 
-* Returning `true` sets `DWLP_MSGRESULT` to `result` and returns `TRUE`
-* Returning `false` returns `FALSE` so the dialog manager performs default processing
+- Returning `true` sets `DWLP_MSGRESULT` to `result` and returns `TRUE`
+- Returning `false` returns `FALSE` so the dialog manager performs default processing
 
 ## Design notes
 
@@ -288,9 +288,9 @@ The `Wnd*` back-pointer is stored as a window property (`SetProp` / `GetProp`) k
 
 This avoids:
 
-* a global `map<HWND, Wnd*>`
-* explicit locking
-* global lifetime coordination
+- a global `map<HWND, Wnd*>`
+- explicit locking
+- global lifetime coordination
 
 Atom-based lookup is effectively a single integer comparison.
 
@@ -310,9 +310,9 @@ Win32 windows are thread-affine.
 
 A `Wnd` or `Dlg` instance must be:
 
-* created
-* used
-* destroyed
+- created
+- used
+- destroyed
 
 on the thread that owns the underlying `HWND`.
 
