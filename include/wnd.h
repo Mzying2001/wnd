@@ -643,9 +643,14 @@ protected:
     }
 
 public:
-    Wnd(const Wnd&) = delete;            /**< Non-copyable: copying a window handle is meaningless. */
-    Wnd& operator=(Wnd&&) = delete;      /**< Move-assignment is disabled to avoid aliasing on the prop. */
-    Wnd& operator=(const Wnd&) = delete; /**< Non-copyable. */
+    /** Non-copyable: copying a window handle is meaningless. */
+    Wnd(const Wnd &) = delete;
+
+    /** Move-assignment is disabled to avoid aliasing on the prop. */
+    Wnd &operator=(Wnd &&) = delete;
+
+    /** Non-copyable. */
+    Wnd &operator=(const Wnd &) = delete;
 
     /**
      * @brief Move-constructs from @p other, transferring `HWND` ownership and
@@ -820,7 +825,8 @@ class Dlg : public Wnd<TDerived>
     /** Convenience alias for the `Wnd` base, used inside Dlg member bodies. */
     using TBase = Wnd<TDerived>;
 
-    bool _isModal; /**< `true` when the dialog was created via `CreateModal()`. */
+    /** `true` when the dialog was created via `CreateModal()`. */
+    bool _isModal;
 
     /**
      * @brief Marshalling struct passed through the dialog manager's
@@ -832,7 +838,7 @@ class Dlg : public Wnd<TDerived>
      */
     struct _CreateParam
     {
-        Dlg* pThis;     /**< Pointer to the `Dlg` instance owning the soon-to-be dialog. */
+        Dlg*   pThis;   /**< Pointer to the `Dlg` instance owning the soon-to-be dialog. */
         LPVOID lpParam; /**< User-supplied init param to restore at `WM_INITDIALOG` dispatch. */
     };
 
@@ -1055,9 +1061,14 @@ protected:
 #endif
 
 public:
-    Dlg(const Dlg&) = delete;            /**< Non-copyable. */
-    Dlg& operator=(Dlg&&) = delete;      /**< Move-assignment disabled (mirrors `Wnd`). */
-    Dlg& operator=(const Dlg&) = delete; /**< Non-copyable. */
+    /** Non-copyable. */
+    Dlg(const Dlg &) = delete;
+
+    /** Move-assignment disabled (mirrors `Wnd`). */
+    Dlg &operator=(Dlg &&) = delete;
+
+    /** Non-copyable. */
+    Dlg &operator=(const Dlg &) = delete;
 
     /**
      * @brief Move-constructs from @p other, transferring both base-class
