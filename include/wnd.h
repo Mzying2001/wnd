@@ -886,6 +886,14 @@ private:
             bool handled =
                 pThis->WndProc(msg, lResult);
 
+            // Guard against self-deletion: if the user called "delete this" inside
+            // WndProc, the destructor has already removed the prop. In that case
+            // the prop lookup returns nullptr (or a different value), and we must
+            // bail out immediately to avoid touching freed memory.
+            if (TBase::GetThisFromHandle(hDlg) != pThis) {
+                return FALSE;
+            }
+
             if (uMsg == WM_NCDESTROY) {
                 pThis->_destroyed = true;
                 ::RemoveProp(hDlg, TBase::_PROP_THIS());
@@ -1116,6 +1124,9 @@ public:
             else {
                 ::DestroyWindow(self._hWnd);
             }
+            // Remove the prop ourselves, since we are about to prevent ~Wnd
+            // from running its cleanup by setting _destroyed below.
+            ::RemoveProp(self._hWnd, TBase::_PROP_THIS());
         }
         // Mark destroyed before ~Wnd runs so the base destructor short-circuits.
         self._destroyed = true;
