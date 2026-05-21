@@ -294,12 +294,12 @@ private:
         if (pThis != nullptr)
         {
             Msg msg{ uMsg, wParam, lParam };
+
             LRESULT result = 0;
+            WNDPROC defProc = pThis->_defWndProc;
 
             if (uMsg == WM_NCDESTROY)
             {
-                WNDPROC defProc = pThis->_defWndProc;
-
                 pThis->_destroyed = true;
                 ::RemoveProp(hWnd, _PROP_THIS());
 
@@ -323,15 +323,23 @@ private:
             bool handled = pThis->WndProc(msg, result);
 
             // Re-read the prop: if user code deleted the instance during
-            // WndProc, the prop is gone (RemoveProp in NCDESTROY) and we
-            // must not dereference pThis again.
+            // WndProc (e.g. DestroyWindow was called, triggering NCDESTROY),
+            // the prop is gone and we must not dereference pThis again.
             if (GetThisFromHandle(hWnd) != pThis) {
+                if (handled) {
+                    return result;
+                }
 #if defined(WND_USE_ANSI_API)
-                return ::DefWindowProcA(hWnd, uMsg, wParam, lParam);
+                return defProc != nullptr
+                    ? ::CallWindowProcA(defProc, hWnd, uMsg, wParam, lParam)
+                    : ::DefWindowProcA(hWnd, uMsg, wParam, lParam);
 #else
-                return ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
+                return defProc != nullptr
+                    ? ::CallWindowProcW(defProc, hWnd, uMsg, wParam, lParam)
+                    : ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
 #endif
             }
+            
             if (!handled) {
                 result = pThis->DefWndProc(msg);
             }
