@@ -281,9 +281,10 @@ private:
      *
      * Special handling:
      *  - On `WM_NCDESTROY`, marks the wrapper `_destroyed` and removes the
-     *    prop so any later prop-lookup correctly returns `nullptr`.
-     *  - After every callback into user code, re-reads the prop to detect
-     *    self-deletion (`delete this` inside `WndProc`) and falls through
+     *    prop before calling user code, so `delete this` inside that final
+     *    callback cannot re-enter teardown through the destructor.
+     *  - For non-`WM_NCDESTROY` messages, re-reads the prop after every
+     *    callback into user code to detect self-deletion and fall through
      *    to `DefWindowProc` instead of touching the freed instance.
      */
     static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -294,6 +295,30 @@ private:
         {
             Msg msg{ uMsg, wParam, lParam };
             LRESULT result = 0;
+
+            if (uMsg == WM_NCDESTROY)
+            {
+                WNDPROC defProc = pThis->_defWndProc;
+
+                pThis->_destroyed = true;
+                ::RemoveProp(hWnd, _PROP_THIS());
+
+                bool handled = pThis->WndProc(msg, result);
+
+                if (!handled)
+                {
+#if defined(WND_USE_ANSI_API)
+                    result = defProc != nullptr
+                        ? ::CallWindowProcA(defProc, hWnd, uMsg, wParam, lParam)
+                        : ::DefWindowProcA(hWnd, uMsg, wParam, lParam);
+#else
+                    result = defProc != nullptr
+                        ? ::CallWindowProcW(defProc, hWnd, uMsg, wParam, lParam)
+                        : ::DefWindowProcW(hWnd, uMsg, wParam, lParam);
+#endif
+                }
+                return result;
+            }
 
             bool handled = pThis->WndProc(msg, result);
 
@@ -309,15 +334,6 @@ private:
             }
             if (!handled) {
                 result = pThis->DefWndProc(msg);
-                // Same self-deletion guard for DefWndProc, which can also
-                // re-enter user code via the original WNDPROC.
-                if (GetThisFromHandle(hWnd) != pThis) {
-                    return result;
-                }
-            }
-            if (uMsg == WM_NCDESTROY) {
-                pThis->_destroyed = true;
-                ::RemoveProp(hWnd, _PROP_THIS());
             }
             return result;
         }
@@ -851,7 +867,9 @@ private:
      *  - On the very first `WM_INITDIALOG`, unwraps the `_CreateParam*`
      *    smuggled through `lParam`, binds the `Dlg*`, and replaces `lParam`
      *    with the user's original `dwInitParam` for the user's WndProc.
-     *  - On `WM_NCDESTROY`, marks the wrapper destroyed and removes the prop.
+     *  - On `WM_NCDESTROY`, marks the wrapper destroyed and removes the prop
+     *    before invoking user code, so self-deletion in that final callback
+     *    cannot re-enter teardown through the destructor.
      *  - Maps the WndProc `bool`/`LRESULT` pair onto the DLGPROC
      *    `INT_PTR`/`DWLP_MSGRESULT` convention as described in the class
      *    header.
@@ -883,21 +901,23 @@ private:
             Msg msg{ uMsg, wParam, lParam };
             LRESULT lResult = 0;
 
-            bool handled =
-                pThis->WndProc(msg, lResult);
-
-            // Guard against self-deletion: if the user called "delete this" inside
-            // WndProc, the destructor has already removed the prop. In that case
-            // the prop lookup returns nullptr (or a different value), and we must
-            // bail out immediately to avoid touching freed memory.
-            if (TBase::GetThisFromHandle(hDlg) != pThis) {
-                return FALSE;
-            }
-
             if (uMsg == WM_NCDESTROY) {
                 pThis->_destroyed = true;
                 ::RemoveProp(hDlg, TBase::_PROP_THIS());
             }
+
+            bool handled =
+                pThis->WndProc(msg, lResult);
+
+            // Guard against self-deletion: for ordinary messages the
+            // destructor removes the prop, and we must not touch pThis again.
+            // WM_NCDESTROY removes the prop before dispatch by design; after
+            // that callback only stack locals and the HWND are used below.
+            if (uMsg != WM_NCDESTROY &&
+                TBase::GetThisFromHandle(hDlg) != pThis) {
+                return FALSE;
+            }
+
             if (handled) {
                 // DLGPROC convention: return TRUE and stash the actual
                 // LRESULT in DWLP_MSGRESULT for the dialog manager to read.
